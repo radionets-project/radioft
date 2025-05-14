@@ -8,7 +8,9 @@ dynamic = ["version"]
 description = "Fourier transform implementations for radio interferometry applications."
 readme = "README.md"
 authors = [
-  { name = "Kevin Schmitz, Anno Knierim, Tom Groß" },
+  { name = "Kevin Schmitz", email = "kevin2.schmitz@tu-dortmund.de" },
+  { name = "Anno Knierim", email = "anno.knierim@tu-dortmund.de" },
+  { name = "Tom Groß", email = "tom.gross@tu-dortmund.de" },
 ]
 maintainers = [
   { name = "Kevin Schmitz", email = "kevin2.schmitz@tu-dortmund.de" },
