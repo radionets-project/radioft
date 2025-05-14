@@ -1,263 +1,180 @@
 import torch
-from torch.autograd import Function
-# need to import cuda kernels -> compute_phase_matrix and compute_inverse_phase_matrix
-from cuda_precision_kernel import precision_cuda_kernels
+from .utils import cuda_dft, cuda_idft
+from radioft.utils.sizes import get_optimal_chunk_sizes
 
 
-class CudaDFTFunction(Function):
-    @staticmethod
-    def forward(ctx, sky_values, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords):
-        # Save for backward
-        ctx.save_for_backward(l_coords, m_coords, n_coords, u_coords, v_coords, w_coords)
+class HybridPyTorchCudaDFT:
+    """
+    Deterministic hybrid PyTorch-CUDA DFT implementation with performance optimizations
+    """
+    def __init__(self, device="cuda", max_matrix_size_gb=1.0, benchmark=True):
+        self.device = device
+        self.max_matrix_size_gb = max_matrix_size_gb
 
-        # Get phase matrix from CUDA kernel
-        phase_matrix = precision_cuda_kernels.compute_phase_matrix(
-            l_coords, m_coords, n_coords,
-            u_coords, v_coords, w_coords
-        )
+        # Set deterministic algorithms for more consistent performance
+        torch.backends.cudnn.deterministic = True
+        torch.backends.cudnn.benchmark = benchmark
 
-        # Compute trig functions
-        cos_phase = torch.cos(phase_matrix)
-        sin_phase = torch.sin(phase_matrix)
+        self.dft = cuda_dft
+        self.idft = cuda_idft
 
-        # Extract real and imaginary parts of sky values
-        sky_real = torch.real(sky_values)
-        sky_imag = torch.imag(sky_values)
+    def forward(self, sky_values, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords):
+        """
+        Compute DFT with predictable performance
+        """
+        # Start with empty cache for more deterministic behavior
+        torch.cuda.empty_cache()
 
-        # Handle batch dimension
-        batch_size = sky_values.shape[0] if sky_values.dim() > 1 else 1
+        # Convert to appropriate format
+        sky_values = sky_values.to(self.device).cdouble()
+        l_coords = l_coords.to(self.device).double()
+        m_coords = m_coords.to(self.device).double()
+        n_coords = n_coords.to(self.device).double()
+        u_coords = u_coords.to(self.device).double()
+        v_coords = v_coords.to(self.device).double()
+        w_coords = w_coords.to(self.device).double()
+
+        # Handle batched or unbatched input
         if sky_values.dim() == 1:
-            sky_real = sky_real.unsqueeze(0)
-            sky_imag = sky_imag.unsqueeze(0)
+            unbatched_input = True
+            sky_values = sky_values.unsqueeze(0)
+        else:
+            unbatched_input = False
 
-        # Pre-allocate output tensors
-        num_vis = phase_matrix.shape[0]
-        vis_real = torch.zeros((batch_size, num_vis), dtype=torch.float64, device=sky_values.device)
-        vis_imag = torch.zeros((batch_size, num_vis), dtype=torch.float64, device=sky_values.device)
+        batch_size = sky_values.shape[0]
+        num_pixels = len(l_coords)
+        num_vis = len(u_coords)
 
-        # Process each batch separately
-        for b in range(batch_size):
-            # Matrix multiply for each batch item
-            vis_real[b] = (cos_phase @ sky_real[b]) - (sin_phase @ sky_imag[b])
-            vis_imag[b] = (sin_phase @ sky_real[b]) + (cos_phase @ sky_imag[b])
+        # Get optimized chunk sizes
+        vis_chunk_size, pixel_chunk_size = self.get_optimal_chunk_sizes(num_pixels, num_vis, self.max_matrix_size_gb)
 
-        # Combine to complex
-        visibilities = torch.complex(vis_real, vis_imag)
+        # Pre-allocate output with zeros
+        visibilities = torch.zeros((batch_size, num_vis), dtype=torch.complex128, device=self.device)
 
-        # Remove batch dimension if input wasn't batched
-        if sky_values.dim() == 1:
+        # Calculate total chunks for progress bar
+        total_chunks = ((num_vis + vis_chunk_size - 1) // vis_chunk_size) * \
+                      ((num_pixels + pixel_chunk_size - 1) // pixel_chunk_size)
+
+        # Use fixed seed for more deterministic behavior
+        torch.manual_seed(0)
+
+        # Process visibility points in chunks
+        for vis_start in range(0, num_vis, vis_chunk_size):
+            vis_end = min(vis_start + vis_chunk_size, num_vis)
+            vis_chunk_len = vis_end - vis_start
+
+            # Get current visibility chunk
+            u_chunk = u_coords[vis_start:vis_end].contiguous()  # Force contiguous for better performance
+            v_chunk = v_coords[vis_start:vis_end].contiguous()
+            w_chunk = w_coords[vis_start:vis_end].contiguous()
+
+            # Pre-allocate accumulators for this visibility chunk - more efficient
+            chunk_vis = torch.zeros((batch_size, vis_chunk_len),
+                                    dtype=torch.complex128, device=self.device)
+
+            # Process pixels in chunks
+            for pixel_start in range(0, num_pixels, pixel_chunk_size):
+                pixel_end = min(pixel_start + pixel_chunk_size, num_pixels)
+                pixel_chunk_len = pixel_end - pixel_start
+
+                # Get current pixel chunk - force contiguous for better performance
+                l_chunk = l_coords[pixel_start:pixel_end].contiguous()
+                m_chunk = m_coords[pixel_start:pixel_end].contiguous()
+                n_chunk = n_coords[pixel_start:pixel_end].contiguous()
+
+                sky_values_chunk = sky_values[:, pixel_start:pixel_end]
+                chunk_vis += self.dft(sky_values_chunk, l_chunk, m_chunk, n_chunk, u_chunk, v_chunk, w_chunk)
+            # Store result for this visibility chunk
+            visibilities[:, vis_start:vis_end] = chunk_vis
+
+            # Clean up
+            del chunk_vis
+
+        # Remove batch dimension if input was not batched
+        if unbatched_input:
             visibilities = visibilities.squeeze(0)
 
         return visibilities
 
-    @staticmethod
-    def backward(ctx, grad_output):
-        # Retrieve saved tensors
-        l_coords, m_coords, n_coords, u_coords, v_coords, w_coords = ctx.saved_tensors
-
-        # Initialize gradients as None
-        grad_sky = grad_l = grad_m = grad_n = grad_u = grad_v = grad_w = None
-
-        # Handle batch dimension
-        batch_size = grad_output.shape[0] if grad_output.dim() > 1 else 1
-        unbatched_grad = (grad_output.dim() == 1)
-
-        # We only care about gradient with respect to sky_values for the neural network
-        if ctx.needs_input_grad[0]:
-            # Get phase matrix again
-            phase_matrix = precision_cuda_kernels.compute_phase_matrix(
-                l_coords, m_coords, n_coords,
-                u_coords, v_coords, w_coords
-            )
-
-            # Compute trig functions
-            cos_phase = torch.cos(phase_matrix)
-            sin_phase = torch.sin(phase_matrix)
-
-            # Extract real and imaginary parts of gradients
-            grad_real = torch.real(grad_output)
-            grad_imag = torch.imag(grad_output)
-
-            if unbatched_grad:
-                grad_real = grad_real.unsqueeze(0)
-                grad_imag = grad_imag.unsqueeze(0)
-
-            # Pre-allocate output tensors
-            num_pixels = phase_matrix.shape[1]
-            grad_sky_real = torch.zeros((batch_size, num_pixels), dtype=torch.float64, device=grad_output.device)
-            grad_sky_imag = torch.zeros((batch_size, num_pixels), dtype=torch.float64, device=grad_output.device)
-
-            # Process each batch separately
-            for b in range(batch_size):
-                # Compute gradients via transpose of forward pass operations
-                grad_sky_real[b] = (cos_phase.T @ grad_real[b]) + (sin_phase.T @ grad_imag[b])
-                grad_sky_imag[b] = (-sin_phase.T @ grad_real[b]) + (cos_phase.T @ grad_imag[b])
-
-            # Combine to complex
-            grad_sky = torch.complex(grad_sky_real, grad_sky_imag)
-
-            # Remove batch dimension if input wasn't batched
-            if unbatched_grad:
-                grad_sky = grad_sky.squeeze(0)
-
-        # Return gradients for all inputs
-        return grad_sky, grad_l, grad_m, grad_n, grad_u, grad_v, grad_w
-
-
-class CudaIDFTFunction(Function):
-    @staticmethod
-    def forward(ctx, visibilities, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords):
+    def inverse(self, visibilities, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords):
         """
-        Simplified forward pass that computes inverse DFT for a single chunk
-        without handling the overall chunking strategy
+        Compute inverse DFT with built-in chunking like the forward method
         """
-        # Save for backward
-        ctx.save_for_backward(l_coords, m_coords, n_coords, u_coords, v_coords, w_coords)
+        # Clear cache before starting
+        torch.cuda.empty_cache()
 
-        # Handle batch dimension
-        batch_size = visibilities.shape[0] if visibilities.dim() > 1 else 1
+        # Convert to appropriate format
+        visibilities = visibilities.to(self.device).cdouble()
+        l_coords = l_coords.to(self.device).double()
+        m_coords = m_coords.to(self.device).double()
+        n_coords = n_coords.to(self.device).double()
+        u_coords = u_coords.to(self.device).double()
+        v_coords = v_coords.to(self.device).double()
+        w_coords = w_coords.to(self.device).double()
+
+        # Handle batched or unbatched input
         if visibilities.dim() == 1:
+            unbatched_input = True
             visibilities = visibilities.unsqueeze(0)
+        else:
+            unbatched_input = False
 
         # Extract dimensions
-        num_vis = u_coords.shape[0]      # Number of visibility points in this chunk
-        num_pixels = l_coords.shape[0]   # Number of pixel points in this chunk
+        batch_size = visibilities.shape[0]
+        num_pixels = l_coords.shape[0]
+        num_vis = u_coords.shape[0]
 
-        # Store for backward pass
-        ctx.num_vis = num_vis
-        ctx.num_pixels = num_pixels
+        # Get optimized chunk sizes
+        vis_chunk_size, pixel_chunk_size = self._get_optimal_chunk_sizes(num_pixels, num_vis)
+
+        # Pre-allocate output tensor for sky image
+        sky_values = torch.zeros((batch_size, num_pixels), dtype=torch.complex128, device=self.device)
 
         # Extract real and imaginary parts of visibilities
         vis_real = torch.real(visibilities)
         vis_imag = torch.imag(visibilities)
 
-        # Pre-allocate output tensor for this chunk
-        sky_values = torch.zeros((batch_size, num_pixels),
-                               dtype=visibilities.dtype,
-                               device=visibilities.device)
+        # Process pixel points in chunks
+        for pixel_start in range(0, num_pixels, pixel_chunk_size):
+            pixel_end = min(pixel_start + pixel_chunk_size, num_pixels)
+            pixel_chunk_len = pixel_end - pixel_start
 
-        # Compute phase matrix for this chunk
-        phase_matrix = precision_cuda_kernels.compute_inverse_phase_matrix(
-            l_coords, m_coords, n_coords,
-            u_coords, v_coords, w_coords
-        )
+            # Get current pixel chunk coordinates
+            l_chunk = l_coords[pixel_start:pixel_end].contiguous()
+            m_chunk = m_coords[pixel_start:pixel_end].contiguous()
+            n_chunk = n_coords[pixel_start:pixel_end].contiguous()
 
-        # Compute trig functions
-        cos_phase = torch.cos(phase_matrix)
-        sin_phase = torch.sin(phase_matrix)
+            # Pre-allocate accumulators for this visibility chunk - more efficient
+            sky_values_chunk = torch.zeros((batch_size, pixel_chunk_len),
+                    dtype=torch.complex128, device=self.device)
 
-        # Process each batch separately
-        for b in range(batch_size):
-            # Extract visibility data for this batch
-            batch_vis_real = vis_real[b]  # [num_vis]
-            batch_vis_imag = vis_imag[b]  # [num_vis]
+            # Process visibility points in sub-chunks
+            for vis_start in range(0, num_vis, vis_chunk_size):
+                vis_end = min(vis_start + vis_chunk_size, num_vis)
+                vis_chunk_len = vis_end - vis_start
 
-            # Reshape for efficient matrix multiplication
-            batch_vis_real_col = batch_vis_real.reshape(-1, 1)  # [num_vis, 1]
-            batch_vis_imag_col = batch_vis_imag.reshape(-1, 1)  # [num_vis, 1]
+                # Get current visibility chunk
+                u_chunk = u_coords[vis_start:vis_end].contiguous()
+                v_chunk = v_coords[vis_start:vis_end].contiguous()
+                w_chunk = w_coords[vis_start:vis_end].contiguous()
 
-            # Using efficient matrix operations
-            # [num_pixels, num_vis] @ [num_vis, 1]
-            real_contrib = torch.matmul(cos_phase.T, batch_vis_real_col) - \
-                         torch.matmul(sin_phase.T, batch_vis_imag_col)
-            imag_contrib = torch.matmul(sin_phase.T, batch_vis_real_col) + \
-                         torch.matmul(cos_phase.T, batch_vis_imag_col)
+                # Get visibility data for this chunk
+                vis_chunk = visibilities[:, vis_start:vis_end]
 
-            # Store result for this batch
-            sky_values[b] = torch.complex(real_contrib.squeeze(), imag_contrib.squeeze())
+                sky_values_chunk += self.idft(vis_chunk, l_chunk, m_chunk, n_chunk, u_chunk, v_chunk, w_chunk)
+
+            # Add contribution to the sky values
+            sky_values[:, pixel_start:pixel_end] += sky_values_chunk
+
+            # Free memory
+            torch.cuda.empty_cache()
+            del sky_values_chunk
+
+        # Normalize by number of visibility points
+        sky_values = sky_values / num_vis
 
         # Remove batch dimension if input wasn't batched
-        if visibilities.dim() == 1:
+        if unbatched_input:
             sky_values = sky_values.squeeze(0)
 
         return sky_values
-
-    @staticmethod
-    def backward(ctx, grad_output):
-        """
-        Backward pass for the simplified IDFT function
-        """
-        # Retrieve saved tensors
-        l_coords, m_coords, n_coords, u_coords, v_coords, w_coords = ctx.saved_tensors
-        num_vis = ctx.num_vis
-        num_pixels = ctx.num_pixels
-
-        # Initialize gradients as None
-        grad_vis = grad_l = grad_m = grad_n = grad_u = grad_v = grad_w = None
-
-        # We only compute gradient for visibilities if required
-        if ctx.needs_input_grad[0]:
-            # Handle batch dimension
-            batch_size = grad_output.shape[0] if grad_output.dim() > 1 else 1
-            unbatched = grad_output.dim() == 1
-            if unbatched:
-                grad_output = grad_output.unsqueeze(0)
-
-            # Pre-allocate gradient tensor for visibilities
-            grad_vis = torch.zeros((batch_size, num_vis),
-                                dtype=torch.complex128 if grad_output.dtype == torch.complex128 else torch.complex64,
-                                device=grad_output.device)
-
-            # Extract real and imaginary parts of grad_output
-            grad_real = torch.real(grad_output)  # [batch_size, num_pixels]
-            grad_imag = torch.imag(grad_output)  # [batch_size, num_pixels]
-
-            # Compute phase matrix for gradient computation (use forward phase)
-            # For backward pass through IDFT, we need the complex conjugate
-            # of the forward phase factors (which is the regular DFT phase)
-            phase_matrix = precision_cuda_kernels.compute_phase_matrix(
-                l_coords, m_coords, n_coords,
-                u_coords, v_coords, w_coords
-            )
-
-            # Compute trig functions
-            cos_phase = torch.cos(phase_matrix)  # [num_vis, num_pixels]
-            sin_phase = torch.sin(phase_matrix)  # [num_vis, num_pixels]
-
-            # Process each batch
-            for b in range(batch_size):
-                # Get gradients for this batch
-                batch_grad_real = grad_real[b]  # [num_pixels]
-                batch_grad_imag = grad_imag[b]  # [num_pixels]
-
-                # Using matrix multiplication to compute gradients
-                # [num_vis, num_pixels] @ [num_pixels]
-                real_grad = torch.matmul(cos_phase, batch_grad_real) + \
-                          torch.matmul(sin_phase, batch_grad_imag)
-                imag_grad = torch.matmul(-sin_phase, batch_grad_real) + \
-                          torch.matmul(cos_phase, batch_grad_imag)
-
-                # Store in gradient tensor
-                grad_vis[b] = torch.complex(real_grad, imag_grad)
-
-            # Remove batch dimension if needed
-            if unbatched:
-                grad_vis = grad_vis.squeeze(0)
-
-        # Return gradients for all inputs
-        return grad_vis, grad_l, grad_m, grad_n, grad_u, grad_v, grad_w
-
-
-
-
-# Create wrapper functions for ease of use
-def cuda_dft(sky_values, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords):
-    """
-    CUDA-accelerated DFT without chunking - for use by HybridPyTorchCudaDFT
-    """
-    return CudaDFTFunction.apply(sky_values, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords)
-
-def cuda_idft(visibilities, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords):
-    """
-    CUDA-accelerated IDFT without chunking - for use by HybridPyTorchCudaDFT
-    """
-    return CudaIDFTFunction.apply(
-        visibilities, l_coords, m_coords, n_coords,
-        u_coords, v_coords, w_coords
-    )
-
-
-
-
-
-
