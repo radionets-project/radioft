@@ -26,10 +26,9 @@ if cuda_available:
         except (subprocess.SubprocessError, FileNotFoundError):
             # Default to a common compute capability if detection fails
             compute_capability = "80"  # Default to Ampere architecture
-    #
-    # Use a default for Windows or if detection failed
+
     if compute_capability is None:
-        compute_capability = "80"  # Default to Volta architecture
+        compute_capability = "80"  # Default to Ampere architecture
 
     # Find all CUDA source files in the radioft/cuda directory
     # cuda_sources = [str(p) for p in Path("radioft/cuda").glob("**/*.cu")]
