@@ -1,6 +1,5 @@
-# Helper function to determine optimal chunk sizes
-
 def get_optimal_chunk_sizes(num_pixels, num_vis, max_memory_gb=4, is_double=True):
+    """Helper function to determine optimal chunk sizes"""
     # Calculate memory per element
     bytes_per_element = 8 if is_double else 4
 
@@ -20,4 +19,4 @@ def get_optimal_chunk_sizes(num_pixels, num_vis, max_memory_gb=4, is_double=True
     pixel_chunk_size = int(max_elements / vis_chunk_size)
     pixel_chunk_size = min(pixel_chunk_size, num_pixels)
     pixel_chunk_size = max(1024, pixel_chunk_size)  # Ensure minimum size for efficiency
-    return vis_chunk_size, pixel_chunk_size 
+    return vis_chunk_size, pixel_chunk_size

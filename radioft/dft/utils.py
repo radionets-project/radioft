@@ -5,14 +5,17 @@ from radioft.cuda.kernels import compute_phase_matrix, compute_inverse_phase_mat
 
 class CudaDFTFunction(Function):
     @staticmethod
-    def forward(ctx, sky_values, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords):
+    def forward(
+        ctx, sky_values, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+    ):
         # Save for backward
-        ctx.save_for_backward(l_coords, m_coords, n_coords, u_coords, v_coords, w_coords)
+        ctx.save_for_backward(
+            l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+        )
 
         # Get phase matrix from CUDA kernel
         phase_matrix = compute_phase_matrix(
-            l_coords, m_coords, n_coords,
-            u_coords, v_coords, w_coords
+            l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
         )
 
         # Compute trig functions
@@ -31,8 +34,12 @@ class CudaDFTFunction(Function):
 
         # Pre-allocate output tensors
         num_vis = phase_matrix.shape[0]
-        vis_real = torch.zeros((batch_size, num_vis), dtype=torch.float64, device=sky_values.device)
-        vis_imag = torch.zeros((batch_size, num_vis), dtype=torch.float64, device=sky_values.device)
+        vis_real = torch.zeros(
+            (batch_size, num_vis), dtype=torch.float64, device=sky_values.device
+        )
+        vis_imag = torch.zeros(
+            (batch_size, num_vis), dtype=torch.float64, device=sky_values.device
+        )
 
         # Process each batch separately
         for b in range(batch_size):
@@ -59,14 +66,13 @@ class CudaDFTFunction(Function):
 
         # Handle batch dimension
         batch_size = grad_output.shape[0] if grad_output.dim() > 1 else 1
-        unbatched_grad = (grad_output.dim() == 1)
+        unbatched_grad = grad_output.dim() == 1
 
         # We only care about gradient with respect to sky_values for the neural network
         if ctx.needs_input_grad[0]:
             # Get phase matrix again
             phase_matrix = compute_phase_matrix(
-                l_coords, m_coords, n_coords,
-                u_coords, v_coords, w_coords
+                l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
             )
 
             # Compute trig functions
@@ -83,14 +89,26 @@ class CudaDFTFunction(Function):
 
             # Pre-allocate output tensors
             num_pixels = phase_matrix.shape[1]
-            grad_sky_real = torch.zeros((batch_size, num_pixels), dtype=l_coords.dtype, device=grad_output.device)
-            grad_sky_imag = torch.zeros((batch_size, num_pixels), dtype=l_coords.dtype, device=grad_output.device)
+            grad_sky_real = torch.zeros(
+                (batch_size, num_pixels),
+                dtype=l_coords.dtype,
+                device=grad_output.device,
+            )
+            grad_sky_imag = torch.zeros(
+                (batch_size, num_pixels),
+                dtype=l_coords.dtype,
+                device=grad_output.device,
+            )
 
             # Process each batch separately
             for b in range(batch_size):
                 # Compute gradients via transpose of forward pass operations
-                grad_sky_real[b] = (cos_phase.T @ grad_real[b]) + (sin_phase.T @ grad_imag[b])
-                grad_sky_imag[b] = (-sin_phase.T @ grad_real[b]) + (cos_phase.T @ grad_imag[b])
+                grad_sky_real[b] = (cos_phase.T @ grad_real[b]) + (
+                    sin_phase.T @ grad_imag[b]
+                )
+                grad_sky_imag[b] = (-sin_phase.T @ grad_real[b]) + (
+                    cos_phase.T @ grad_imag[b]
+                )
 
             # Combine to complex
             grad_sky = torch.complex(grad_sky_real, grad_sky_imag)
@@ -105,13 +123,17 @@ class CudaDFTFunction(Function):
 
 class CudaIDFTFunction(Function):
     @staticmethod
-    def forward(ctx, visibilities, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords):
+    def forward(
+        ctx, visibilities, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+    ):
         """
         Simplified forward pass that computes inverse DFT for a single chunk
         without handling the overall chunking strategy
         """
         # Save for backward
-        ctx.save_for_backward(l_coords, m_coords, n_coords, u_coords, v_coords, w_coords)
+        ctx.save_for_backward(
+            l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+        )
 
         # Handle batch dimension
         batch_size = visibilities.shape[0] if visibilities.dim() > 1 else 1
@@ -119,8 +141,8 @@ class CudaIDFTFunction(Function):
             visibilities = visibilities.unsqueeze(0)
 
         # Extract dimensions
-        num_vis = u_coords.shape[0]      # Number of visibility points in this chunk
-        num_pixels = l_coords.shape[0]   # Number of pixel points in this chunk
+        num_vis = u_coords.shape[0]  # Number of visibility points in this chunk
+        num_pixels = l_coords.shape[0]  # Number of pixel points in this chunk
 
         # Store for backward pass
         ctx.num_vis = num_vis
@@ -131,14 +153,15 @@ class CudaIDFTFunction(Function):
         vis_imag = torch.imag(visibilities)
 
         # Pre-allocate output tensor for this chunk
-        sky_values = torch.zeros((batch_size, num_pixels),
-                               dtype=visibilities.dtype,
-                               device=visibilities.device)
+        sky_values = torch.zeros(
+            (batch_size, num_pixels),
+            dtype=visibilities.dtype,
+            device=visibilities.device,
+        )
 
         # Compute phase matrix for this chunk
         phase_matrix = compute_inverse_phase_matrix(
-            l_coords, m_coords, n_coords,
-            u_coords, v_coords, w_coords
+            l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
         )
 
         # Compute trig functions
@@ -157,13 +180,17 @@ class CudaIDFTFunction(Function):
 
             # Using efficient matrix operations
             # [num_pixels, num_vis] @ [num_vis, 1]
-            real_contrib = torch.matmul(cos_phase.T, batch_vis_real_col) - \
-                         torch.matmul(sin_phase.T, batch_vis_imag_col)
-            imag_contrib = torch.matmul(sin_phase.T, batch_vis_real_col) + \
-                         torch.matmul(cos_phase.T, batch_vis_imag_col)
+            real_contrib = torch.matmul(cos_phase.T, batch_vis_real_col) - torch.matmul(
+                sin_phase.T, batch_vis_imag_col
+            )
+            imag_contrib = torch.matmul(sin_phase.T, batch_vis_real_col) + torch.matmul(
+                cos_phase.T, batch_vis_imag_col
+            )
 
             # Store result for this batch
-            sky_values[b] = torch.complex(real_contrib.squeeze(), imag_contrib.squeeze())
+            sky_values[b] = torch.complex(
+                real_contrib.squeeze(), imag_contrib.squeeze()
+            )
 
         # Remove batch dimension if input wasn't batched
         if visibilities.dim() == 1:
@@ -193,9 +220,13 @@ class CudaIDFTFunction(Function):
                 grad_output = grad_output.unsqueeze(0)
 
             # Pre-allocate gradient tensor for visibilities
-            grad_vis = torch.zeros((batch_size, num_vis),
-                                dtype=torch.complex128 if grad_output.dtype == torch.complex128 else torch.complex64,
-                                device=grad_output.device)
+            grad_vis = torch.zeros(
+                (batch_size, num_vis),
+                dtype=torch.complex128
+                if grad_output.dtype == torch.complex128
+                else torch.complex64,
+                device=grad_output.device,
+            )
 
             # Extract real and imaginary parts of grad_output
             grad_real = torch.real(grad_output)  # [batch_size, num_pixels]
@@ -205,8 +236,7 @@ class CudaIDFTFunction(Function):
             # For backward pass through IDFT, we need the complex conjugate
             # of the forward phase factors (which is the regular DFT phase)
             phase_matrix = compute_phase_matrix(
-                l_coords, m_coords, n_coords,
-                u_coords, v_coords, w_coords
+                l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
             )
 
             # Compute trig functions
@@ -221,10 +251,12 @@ class CudaIDFTFunction(Function):
 
                 # Using matrix multiplication to compute gradients
                 # [num_vis, num_pixels] @ [num_pixels]
-                real_grad = torch.matmul(cos_phase, batch_grad_real) + \
-                          torch.matmul(sin_phase, batch_grad_imag)
-                imag_grad = torch.matmul(-sin_phase, batch_grad_real) + \
-                          torch.matmul(cos_phase, batch_grad_imag)
+                real_grad = torch.matmul(cos_phase, batch_grad_real) + torch.matmul(
+                    sin_phase, batch_grad_imag
+                )
+                imag_grad = torch.matmul(-sin_phase, batch_grad_real) + torch.matmul(
+                    cos_phase, batch_grad_imag
+                )
 
                 # Store in gradient tensor
                 grad_vis[b] = torch.complex(real_grad, imag_grad)
@@ -237,26 +269,20 @@ class CudaIDFTFunction(Function):
         return grad_vis, grad_l, grad_m, grad_n, grad_u, grad_v, grad_w
 
 
-
-
 # Create wrapper functions for ease of use
 def cuda_dft(sky_values, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords):
     """
     CUDA-accelerated DFT without chunking - for use by HybridPyTorchCudaDFT
     """
-    return CudaDFTFunction.apply(sky_values, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords)
+    return CudaDFTFunction.apply(
+        sky_values, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+    )
+
 
 def cuda_idft(visibilities, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords):
     """
     CUDA-accelerated IDFT without chunking - for use by HybridPyTorchCudaDFT
     """
     return CudaIDFTFunction.apply(
-        visibilities, l_coords, m_coords, n_coords,
-        u_coords, v_coords, w_coords
+        visibilities, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
     )
-
-
-
-
-
-
