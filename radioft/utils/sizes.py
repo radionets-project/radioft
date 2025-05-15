@@ -7,7 +7,7 @@ def get_optimal_chunk_sizes(num_pixels, num_vis, max_memory_gb=4, is_double=True
     # Calculate memory footprint for phase matrix of different sizes
     # We need 2 phase matrices (cos and sin) plus some overhead
     # Let's determine optimal chunk sizes that fit within max_memory_gb
-    max_memory_bytes = max_memory_gb * 1024**3 * 0.9  # Use 80% of specified max memory
+    max_memory_bytes = max_memory_gb * 1024**3 * 0.8  # Use 80% of specified max memory
 
     # Strategy: Use larger visibility chunks and adjust pixel chunks
     # This makes better use of GPU parallelism
