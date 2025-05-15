@@ -1,9 +1,10 @@
 import os
-from pathlib import Path
 import platform
 import subprocess
-from setuptools import setup, find_packages
-from torch.utils.cpp_extension import BuildExtension, CUDAExtension, CUDA_HOME
+from pathlib import Path
+
+from setuptools import find_packages, setup
+from torch.utils.cpp_extension import CUDA_HOME, BuildExtension, CUDAExtension
 
 # Check if CUDA is available
 cuda_available = CUDA_HOME is not None
@@ -34,6 +35,7 @@ if cuda_available:
     # cuda_sources = [str(p) for p in Path("radioft/cuda").glob("**/*.cu")]
     cuda_dir = Path("radioft/cuda")
     cuda_sources = list(cuda_dir.glob("**/*.cu"))
+    cuda_sources.append(cuda_dir / "cuda_bindings.cpp")
 
     gencode = f"arch=compute_{compute_capability},code=sm_{compute_capability}"
 
