@@ -1,0 +1,98 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - '**'
+  pull_request:
+
+env:
+  MPLBACKEND: Agg
+  PYTEST_ADDOPTS: --color=yes
+  GITHUB_PR_NUMBER: ${{ github.event.number }}
+
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.11"
+            install-method: mamba
+
+          - os: ubuntu-latest
+            python-version: "3.12"
+            install-method: mamba
+            extra-args: ["codecov"]
+
+    defaults:
+      run:
+        # We need login shells (-l) for micromamba to work.
+        shell: bash -leo pipefail {0}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare mamba installation
+        if: matrix.install-method == 'mamba' &&  contains(github.event.pull_request.labels.*.name, 'documentation-only') == false
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+        run: |
+          # setup correct python version
+          sed -i -e "s/- python.*/- python=$PYTHON_VERSION/g" environment.yml
+
+      - name: mamba setup
+        if: matrix.install-method == 'mamba' &&  contains(github.event.pull_request.labels.*.name, 'documentation-only') == false
+        uses: mamba-org/setup-micromamba@v1
+        with:
+          environment-file: environment.yml
+          cache-downloads: true
+
+      - name: Install dependencies
+        env:
+          PYTHON_VERSION: ${{ matrix.python-version }}
+        run: |
+          python --version
+          pip install pytest-cov restructuredtext-lint pytest-xdist 'coverage!=6.3.0'
+          pip install -e .[all]
+          pip freeze
+          pip list
+
+      - name: List installed package versions (conda)
+        if: matrix.environment-type == 'mamba'
+        run: micromamba list
+
+      - name: Tests
+        run: |
+          pytest -vv --cov --cov-report=xml
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install doc dependencies
+        run: |
+          sudo apt update --yes && sudo apt install --yes git 
+          pip install -U pip towncrier
+
+      - name: Produce Changelog
+        run: |
+          towncrier build --yes --version==0.0.0
