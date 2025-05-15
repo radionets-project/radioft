@@ -50,7 +50,13 @@ write_to = "radioft/_version.py"
 where = ["."]
 
 [tool.coverage.run]
-omit = ["radioft/version.py", "radioft/_version.py", "docs/*"]
+omit = [
+  "radioft/version.py",
+  "radioft/_version.py",
+  "docs/*",
+  "**/__init__.py",
+  "tests/*",
+]
 
 [tool.coverage.xml]
 output = "coverage.xml"
