@@ -69,30 +69,30 @@ output = "coverage.xml"
     # let towncrier create proper links to the merged PR
     issue_format = "`#{issue} <https://github.com/radionets-project/radioft/pull/{issue}>`__"
 
-    [[tool.towncrier.fragment.feature]]
+    [tool.towncrier.fragment.feature]
         name = "New Features"
         showcontent = true
 
-    [[tool.towncrier.fragment.bugfix]]
+    [tool.towncrier.fragment.bugfix]
         name = "Bug Fixes"
         showcontent = true
 
-    [[tool.towncrier.fragment.api]]
+    [tool.towncrier.fragment.api]
         name = "API Changes"
         showcontent = true
 
-    [[tool.towncrier.fragment.datamodel]]
+    [tool.towncrier.fragment.datamodel]
         name = "Data Model Changes"
         showcontent = true
 
-    [[tool.towncrier.fragment.optimization]]
+    [tool.towncrier.fragment.optimization]
         name = "Refactoring and Optimization"
         showcontent = true
 
-    [[tool.towncrier.fragment.maintenance]]
+    [tool.towncrier.fragment.maintenance]
         name = "Maintenance"
         showcontent = true
 
     [[tool.towncrier.section]]
         name = ""
-        path = ""
+        path = "
