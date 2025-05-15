@@ -95,4 +95,4 @@ output = "coverage.xml"
 
     [[tool.towncrier.section]]
         name = ""
-        path = "
+        path = ""
