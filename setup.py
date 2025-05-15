@@ -21,11 +21,11 @@ if cuda_available:
             compute_capability = output.decode('utf-8').strip().replace('.', '')
         except (subprocess.SubprocessError, FileNotFoundError):
             # Default to a common compute capability if detection fails
-            compute_capability = '70'  # Default to Volta architecture
+            compute_capability = '80'  # Default to Volta architecture
 
     # Use a default for Windows or if detection failed
     if compute_capability is None:
-        compute_capability = '70'  # Default to Volta architecture
+        compute_capability = '80'  # Default to Volta architecture
 
     # Find all CUDA source files in the radioft/cuda directory
     cuda_sources = []
