@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "radioft"
 dynamic = ["version"]
 description = "Fourier transform implementations for radio interferometry applications."
-readme = "README.md"
+readme = "README.rst"
 authors = [
   { name = "Kevin Schmitz", email = "kevin2.schmitz@tu-dortmund.de" },
   { name = "Anno Knierim", email = "anno.knierim@tu-dortmund.de" },
