@@ -65,11 +65,6 @@ class HybridPyTorchCudaDFT:
             (batch_size, num_vis), dtype=torch.complex128, device=self.device
         )
 
-        # Calculate total chunks for progress bar
-        total_chunks = ((num_vis + vis_chunk_size - 1) // vis_chunk_size) * (
-            (num_pixels + pixel_chunk_size - 1) // pixel_chunk_size
-        )
-
         # Use fixed seed for more deterministic behavior
         torch.manual_seed(0)
 
@@ -93,7 +88,6 @@ class HybridPyTorchCudaDFT:
             # Process pixels in chunks
             for pixel_start in range(0, num_pixels, pixel_chunk_size):
                 pixel_end = min(pixel_start + pixel_chunk_size, num_pixels)
-                pixel_chunk_len = pixel_end - pixel_start
 
                 # Get current pixel chunk - force contiguous for better performance
                 l_chunk = l_coords[pixel_start:pixel_end].contiguous()
@@ -170,10 +164,6 @@ class HybridPyTorchCudaDFT:
             (batch_size, num_pixels), dtype=torch.complex128, device=self.device
         )
 
-        # Extract real and imaginary parts of visibilities
-        vis_real = torch.real(visibilities)
-        vis_imag = torch.imag(visibilities)
-
         # Process pixel points in chunks
         for pixel_start in range(0, num_pixels, pixel_chunk_size):
             pixel_end = min(pixel_start + pixel_chunk_size, num_pixels)
@@ -194,7 +184,6 @@ class HybridPyTorchCudaDFT:
             # Process visibility points in sub-chunks
             for vis_start in range(0, num_vis, vis_chunk_size):
                 vis_end = min(vis_start + vis_chunk_size, num_vis)
-                vis_chunk_len = vis_end - vis_start
 
                 # Get current visibility chunk
                 u_chunk = u_coords[vis_start:vis_end].contiguous()
@@ -447,7 +436,6 @@ class ChunkedDFT(torch.nn.Module):
             u_chunk = u_coords[vis_start:vis_end]
             v_chunk = v_coords[vis_start:vis_end]
             w_chunk = w_coords[vis_start:vis_end]
-            chunk_size = len(u_chunk)
 
             # Process pixel chunks for each visibility chunk
             for pixel_start in range(0, num_pixels, self.chunk_size):
@@ -561,7 +549,6 @@ class ChunkedDFT_sincos(torch.nn.Module):
             u_chunk = u_coords[vis_start:vis_end]
             v_chunk = v_coords[vis_start:vis_end]
             w_chunk = w_coords[vis_start:vis_end]
-            chunk_size = len(u_chunk)
 
             # Process pixel chunks for each visibility chunk
             for pixel_start in range(0, num_pixels, self.chunk_size):

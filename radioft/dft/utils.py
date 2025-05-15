@@ -206,7 +206,6 @@ class CudaIDFTFunction(Function):
         # Retrieve saved tensors
         l_coords, m_coords, n_coords, u_coords, v_coords, w_coords = ctx.saved_tensors
         num_vis = ctx.num_vis
-        num_pixels = ctx.num_pixels
 
         # Initialize gradients as None
         grad_vis = grad_l = grad_m = grad_n = grad_u = grad_v = grad_w = None
