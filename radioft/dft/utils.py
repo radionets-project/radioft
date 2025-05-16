@@ -305,19 +305,51 @@ class CudaIDFTFunction(Function):
 
 
 # Create wrapper functions for ease of use
-def cuda_dft(sky_values, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords):
+def cuda_dft(
+    sky_values,
+    l_coords,
+    m_coords,
+    n_coords,
+    u_coords,
+    v_coords,
+    w_coords,
+    float64=False,
+):
     """
     CUDA-accelerated DFT without chunking - for use by HybridPyTorchCudaDFT
     """
     return CudaDFTFunction.apply(
-        sky_values, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+        sky_values,
+        l_coords,
+        m_coords,
+        n_coords,
+        u_coords,
+        v_coords,
+        w_coords,
+        float64,
     )
 
 
-def cuda_idft(visibilities, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords):
+def cuda_idft(
+    visibilities,
+    l_coords,
+    m_coords,
+    n_coords,
+    u_coords,
+    v_coords,
+    w_coords,
+    float64=False,
+):
     """
     CUDA-accelerated IDFT without chunking - for use by HybridPyTorchCudaDFT
     """
     return CudaIDFTFunction.apply(
-        visibilities, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+        visibilities,
+        l_coords,
+        m_coords,
+        n_coords,
+        u_coords,
+        v_coords,
+        w_coords,
+        float64,
     )
