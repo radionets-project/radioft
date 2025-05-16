@@ -1,0 +1,17 @@
+name: radioft-dev
+channels:
+    - pytorch
+    - defaults
+    - conda-forge
+dependencies:
+  - python=3.12
+  - numpy>=2.0
+  - pip
+  - towncrier
+  - jupyter
+  - pytest
+  - pytest-cov
+  - pytest-runner
+  - pip:
+    - torch>=2.7.0
+    - "-e ."
