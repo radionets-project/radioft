@@ -94,9 +94,14 @@ class CudaDFTFunction(Function):
         # We only care about gradient with respect to sky_values for the neural network
         if ctx.needs_input_grad[0]:
             # Get phase matrix again
-            phase_matrix = compute_phase_matrix(
-                l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
-            )
+            if l_coords.dtype == torch.float64:
+                phase_matrix = compute_phase_matrix(
+                    l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+                )
+            else:
+                phase_matrix = compute_phase_matrix32(
+                    l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+                )
 
             # Compute trig functions
             cos_phase = torch.cos(phase_matrix)
@@ -141,7 +146,7 @@ class CudaDFTFunction(Function):
                 grad_sky = grad_sky.squeeze(0)
 
         # Return gradients for all inputs
-        return grad_sky, grad_l, grad_m, grad_n, grad_u, grad_v, grad_w
+        return grad_sky, grad_l, grad_m, grad_n, grad_u, grad_v, grad_w, None
 
 
 class CudaIDFTFunction(Function):
@@ -270,9 +275,14 @@ class CudaIDFTFunction(Function):
             # Compute phase matrix for gradient computation (use forward phase)
             # For backward pass through IDFT, we need the complex conjugate
             # of the forward phase factors (which is the regular DFT phase)
-            phase_matrix = compute_phase_matrix(
-                l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
-            )
+            if l_coords.dtype == torch.float64:
+                phase_matrix = compute_phase_matrix(
+                    l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+                )
+            else:
+                phase_matrix = compute_phase_matrix32(
+                    l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+                )
 
             # Compute trig functions
             cos_phase = torch.cos(phase_matrix)  # [num_vis, num_pixels]
@@ -301,7 +311,7 @@ class CudaIDFTFunction(Function):
                 grad_vis = grad_vis.squeeze(0)
 
         # Return gradients for all inputs
-        return grad_vis, grad_l, grad_m, grad_n, grad_u, grad_v, grad_w
+        return grad_vis, grad_l, grad_m, grad_n, grad_u, grad_v, grad_w, None
 
 
 # Create wrapper functions for ease of use
