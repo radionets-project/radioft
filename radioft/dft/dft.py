@@ -1,6 +1,10 @@
+from math import pi
+
 import torch
-from .utils import cuda_dft, cuda_idft
+
 from radioft.utils.sizes import get_optimal_chunk_sizes
+
+from .utils import cuda_dft, cuda_idft
 
 
 class HybridPyTorchCudaDFT:
@@ -8,12 +12,14 @@ class HybridPyTorchCudaDFT:
     Deterministic hybrid PyTorch-CUDA DFT implementation with performance optimizations
     """
 
-    def __init__(self, device="cuda", benchmark=False):
+    def __init__(self, device="cuda", benchmark=False, dtype=torch.double):
         self.device = device
 
         # Set deterministic algorithms for more consistent performance
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = benchmark
+
+        self.dtype = dtype
 
         self.dft = cuda_dft
         self.idft = cuda_idft
@@ -337,10 +343,12 @@ class OptimizedPyTorchDFT:
                 w_term = torch.outer(w_chunk, n_chunk_minus_one)
 
                 # Combine terms and compute phase
-                # Using a single combined phase calculation avoids intermediate allocations
+                # Using a single combined phase calculation avoids intermediate
+                # allocations
                 phase = -2.0 * torch.pi * (u_term + v_term + w_term)
 
-                # Pre-compute trig functions (more efficient than complex exponentiation)
+                # Pre-compute trig functions (more efficient than complex
+                # exponentiation)
                 cos_phase = torch.cos(phase)
                 sin_phase = torch.sin(phase)
 
@@ -460,7 +468,7 @@ class ChunkedDFT(torch.nn.Module):
 
                 # Calculate phase
                 phase = (
-                    -2 * np.pi * (u_term + v_term + w_term)
+                    -2 * pi * (u_term + v_term + w_term)
                 )  # [chunk_vis, chunk_pixels]
                 exponential = torch.exp(1j * phase)  # [chunk_vis, chunk_pixels]
 
@@ -469,7 +477,8 @@ class ChunkedDFT(torch.nn.Module):
                     # Extract sky values for this chunk
                     sky_chunk = sky_values[b][pixel_start:pixel_end]  # [chunk_pixels]
 
-                    # Calculate contribution from this pixel chunk to all visibilities in current chunk
+                    # Calculate contribution from this pixel chunk to all
+                    # visibilities in current chunk
                     # [chunk_vis, chunk_pixels] × [chunk_pixels] → [chunk_vis]
                     vis_contribution = exponential @ sky_chunk
 
@@ -573,7 +582,7 @@ class ChunkedDFT_sincos(torch.nn.Module):
 
                 # Calculate phase
                 phase = (
-                    -2 * np.pi * (u_term + v_term + w_term)
+                    -2 * pi * (u_term + v_term + w_term)
                 )  # [chunk_vis, chunk_pixels]
 
                 # Calculate real and imaginary parts of the complex exponential
