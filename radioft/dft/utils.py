@@ -1,12 +1,26 @@
 import torch
 from torch.autograd import Function
-from radioft.cuda.kernels import compute_phase_matrix, compute_inverse_phase_matrix
+
+from radioft.cuda.kernels import (
+    compute_inverse_phase_matrix,
+    compute_inverse_phase_matrix32,
+    compute_phase_matrix,
+    compute_phase_matrix32,
+)
 
 
 class CudaDFTFunction(Function):
     @staticmethod
     def forward(
-        ctx, sky_values, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+        ctx,
+        sky_values,
+        l_coords,
+        m_coords,
+        n_coords,
+        u_coords,
+        v_coords,
+        w_coords,
+        float64=False,
     ):
         # Save for backward
         ctx.save_for_backward(
@@ -14,9 +28,14 @@ class CudaDFTFunction(Function):
         )
 
         # Get phase matrix from CUDA kernel
-        phase_matrix = compute_phase_matrix(
-            l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
-        )
+        if float64:
+            phase_matrix = compute_phase_matrix(
+                l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+            )
+        else:
+            phase_matrix = compute_phase_matrix32(
+                l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+            )
 
         # Compute trig functions
         cos_phase = torch.cos(phase_matrix)
@@ -35,10 +54,14 @@ class CudaDFTFunction(Function):
         # Pre-allocate output tensors
         num_vis = phase_matrix.shape[0]
         vis_real = torch.zeros(
-            (batch_size, num_vis), dtype=torch.float64, device=sky_values.device
+            (batch_size, num_vis),
+            dtype=torch.float64 if float64 else torch.float32,
+            device=sky_values.device,
         )
         vis_imag = torch.zeros(
-            (batch_size, num_vis), dtype=torch.float64, device=sky_values.device
+            (batch_size, num_vis),
+            dtype=torch.float64 if float64 else torch.float32,
+            device=sky_values.device,
         )
 
         # Process each batch separately
@@ -124,7 +147,15 @@ class CudaDFTFunction(Function):
 class CudaIDFTFunction(Function):
     @staticmethod
     def forward(
-        ctx, visibilities, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+        ctx,
+        visibilities,
+        l_coords,
+        m_coords,
+        n_coords,
+        u_coords,
+        v_coords,
+        w_coords,
+        float64=False,
     ):
         """
         Simplified forward pass that computes inverse DFT for a single chunk
@@ -159,10 +190,15 @@ class CudaIDFTFunction(Function):
             device=visibilities.device,
         )
 
-        # Compute phase matrix for this chunk
-        phase_matrix = compute_inverse_phase_matrix(
-            l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
-        )
+        # Compute phase matrix
+        if float64:
+            phase_matrix = compute_inverse_phase_matrix(
+                l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+            )
+        else:
+            phase_matrix = compute_inverse_phase_matrix32(
+                l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+            )
 
         # Compute trig functions
         cos_phase = torch.cos(phase_matrix)
