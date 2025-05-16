@@ -1,12 +1,26 @@
 import torch
 from torch.autograd import Function
-from radioft.cuda.kernels import compute_phase_matrix, compute_inverse_phase_matrix
+
+from radioft.cuda.kernels import (
+    compute_inverse_phase_matrix,
+    compute_inverse_phase_matrix32,
+    compute_phase_matrix,
+    compute_phase_matrix32,
+)
 
 
 class CudaDFTFunction(Function):
     @staticmethod
     def forward(
-        ctx, sky_values, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+        ctx,
+        sky_values,
+        l_coords,
+        m_coords,
+        n_coords,
+        u_coords,
+        v_coords,
+        w_coords,
+        float64=False,
     ):
         # Save for backward
         ctx.save_for_backward(
@@ -14,9 +28,14 @@ class CudaDFTFunction(Function):
         )
 
         # Get phase matrix from CUDA kernel
-        phase_matrix = compute_phase_matrix(
-            l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
-        )
+        if float64:
+            phase_matrix = compute_phase_matrix(
+                l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+            )
+        else:
+            phase_matrix = compute_phase_matrix32(
+                l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+            )
 
         # Compute trig functions
         cos_phase = torch.cos(phase_matrix)
@@ -35,10 +54,14 @@ class CudaDFTFunction(Function):
         # Pre-allocate output tensors
         num_vis = phase_matrix.shape[0]
         vis_real = torch.zeros(
-            (batch_size, num_vis), dtype=torch.float64, device=sky_values.device
+            (batch_size, num_vis),
+            dtype=torch.float64 if float64 else torch.float32,
+            device=sky_values.device,
         )
         vis_imag = torch.zeros(
-            (batch_size, num_vis), dtype=torch.float64, device=sky_values.device
+            (batch_size, num_vis),
+            dtype=torch.float64 if float64 else torch.float32,
+            device=sky_values.device,
         )
 
         # Process each batch separately
@@ -71,9 +94,14 @@ class CudaDFTFunction(Function):
         # We only care about gradient with respect to sky_values for the neural network
         if ctx.needs_input_grad[0]:
             # Get phase matrix again
-            phase_matrix = compute_phase_matrix(
-                l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
-            )
+            if l_coords.dtype == torch.float64:
+                phase_matrix = compute_phase_matrix(
+                    l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+                )
+            else:
+                phase_matrix = compute_phase_matrix32(
+                    l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+                )
 
             # Compute trig functions
             cos_phase = torch.cos(phase_matrix)
@@ -118,13 +146,21 @@ class CudaDFTFunction(Function):
                 grad_sky = grad_sky.squeeze(0)
 
         # Return gradients for all inputs
-        return grad_sky, grad_l, grad_m, grad_n, grad_u, grad_v, grad_w
+        return grad_sky, grad_l, grad_m, grad_n, grad_u, grad_v, grad_w, None
 
 
 class CudaIDFTFunction(Function):
     @staticmethod
     def forward(
-        ctx, visibilities, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+        ctx,
+        visibilities,
+        l_coords,
+        m_coords,
+        n_coords,
+        u_coords,
+        v_coords,
+        w_coords,
+        float64=False,
     ):
         """
         Simplified forward pass that computes inverse DFT for a single chunk
@@ -159,10 +195,15 @@ class CudaIDFTFunction(Function):
             device=visibilities.device,
         )
 
-        # Compute phase matrix for this chunk
-        phase_matrix = compute_inverse_phase_matrix(
-            l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
-        )
+        # Compute phase matrix
+        if float64:
+            phase_matrix = compute_inverse_phase_matrix(
+                l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+            )
+        else:
+            phase_matrix = compute_inverse_phase_matrix32(
+                l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+            )
 
         # Compute trig functions
         cos_phase = torch.cos(phase_matrix)
@@ -234,9 +275,14 @@ class CudaIDFTFunction(Function):
             # Compute phase matrix for gradient computation (use forward phase)
             # For backward pass through IDFT, we need the complex conjugate
             # of the forward phase factors (which is the regular DFT phase)
-            phase_matrix = compute_phase_matrix(
-                l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
-            )
+            if l_coords.dtype == torch.float64:
+                phase_matrix = compute_phase_matrix(
+                    l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+                )
+            else:
+                phase_matrix = compute_phase_matrix32(
+                    l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+                )
 
             # Compute trig functions
             cos_phase = torch.cos(phase_matrix)  # [num_vis, num_pixels]
@@ -265,23 +311,55 @@ class CudaIDFTFunction(Function):
                 grad_vis = grad_vis.squeeze(0)
 
         # Return gradients for all inputs
-        return grad_vis, grad_l, grad_m, grad_n, grad_u, grad_v, grad_w
+        return grad_vis, grad_l, grad_m, grad_n, grad_u, grad_v, grad_w, None
 
 
 # Create wrapper functions for ease of use
-def cuda_dft(sky_values, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords):
+def cuda_dft(
+    sky_values,
+    l_coords,
+    m_coords,
+    n_coords,
+    u_coords,
+    v_coords,
+    w_coords,
+    float64=False,
+):
     """
     CUDA-accelerated DFT without chunking - for use by HybridPyTorchCudaDFT
     """
     return CudaDFTFunction.apply(
-        sky_values, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+        sky_values,
+        l_coords,
+        m_coords,
+        n_coords,
+        u_coords,
+        v_coords,
+        w_coords,
+        float64,
     )
 
 
-def cuda_idft(visibilities, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords):
+def cuda_idft(
+    visibilities,
+    l_coords,
+    m_coords,
+    n_coords,
+    u_coords,
+    v_coords,
+    w_coords,
+    float64=False,
+):
     """
     CUDA-accelerated IDFT without chunking - for use by HybridPyTorchCudaDFT
     """
     return CudaIDFTFunction.apply(
-        visibilities, l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
+        visibilities,
+        l_coords,
+        m_coords,
+        n_coords,
+        u_coords,
+        v_coords,
+        w_coords,
+        float64,
     )

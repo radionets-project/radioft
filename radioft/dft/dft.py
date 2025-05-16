@@ -1,6 +1,10 @@
+from math import pi
+
 import torch
-from .utils import cuda_dft, cuda_idft
+
 from radioft.utils.sizes import get_optimal_chunk_sizes
+
+from .utils import cuda_dft, cuda_idft
 
 
 class HybridPyTorchCudaDFT:
@@ -8,12 +12,14 @@ class HybridPyTorchCudaDFT:
     Deterministic hybrid PyTorch-CUDA DFT implementation with performance optimizations
     """
 
-    def __init__(self, device="cuda", benchmark=False):
+    def __init__(self, device="cuda", benchmark=False, dtype=torch.double):
         self.device = device
 
         # Set deterministic algorithms for more consistent performance
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = benchmark
+
+        self.dtype = dtype
 
         self.dft = cuda_dft
         self.idft = cuda_idft
@@ -28,6 +34,7 @@ class HybridPyTorchCudaDFT:
         v_coords,
         w_coords,
         max_memory_gb=4,
+        float64=False,
     ):
         """
         Compute DFT with predictable performance
@@ -36,13 +43,15 @@ class HybridPyTorchCudaDFT:
         torch.cuda.empty_cache()
 
         # Convert to appropriate format
-        sky_values = sky_values.to(self.device).cdouble()
-        l_coords = l_coords.to(self.device).double()
-        m_coords = m_coords.to(self.device).double()
-        n_coords = n_coords.to(self.device).double()
-        u_coords = u_coords.to(self.device).double()
-        v_coords = v_coords.to(self.device).double()
-        w_coords = w_coords.to(self.device).double()
+        sky_values = sky_values.to(
+            self.device, torch.complex128 if float64 else torch.complex64
+        )
+        l_coords = l_coords.to(self.device, torch.float64 if float64 else torch.float32)
+        m_coords = m_coords.to(self.device, torch.float64 if float64 else torch.float32)
+        n_coords = n_coords.to(self.device, torch.float64 if float64 else torch.float32)
+        u_coords = u_coords.to(self.device, torch.float64 if float64 else torch.float32)
+        v_coords = v_coords.to(self.device, torch.float64 if float64 else torch.float32)
+        w_coords = w_coords.to(self.device, torch.float64 if float64 else torch.float32)
 
         # Handle batched or unbatched input
         if sky_values.dim() == 1:
@@ -62,7 +71,7 @@ class HybridPyTorchCudaDFT:
 
         # Pre-allocate output with zeros
         visibilities = torch.zeros(
-            (batch_size, num_vis), dtype=torch.complex128, device=self.device
+            (batch_size, num_vis), dtype=sky_values.dtype, device=self.device
         )
 
         # Use fixed seed for more deterministic behavior
@@ -82,7 +91,7 @@ class HybridPyTorchCudaDFT:
 
             # Pre-allocate accumulators for this visibility chunk - more efficient
             chunk_vis = torch.zeros(
-                (batch_size, vis_chunk_len), dtype=torch.complex128, device=self.device
+                (batch_size, vis_chunk_len), dtype=sky_values.dtype, device=self.device
             )
 
             # Process pixels in chunks
@@ -103,6 +112,7 @@ class HybridPyTorchCudaDFT:
                     u_chunk,
                     v_chunk,
                     w_chunk,
+                    float64=True if float64 else False,
                 )
             # Store result for this visibility chunk
             visibilities[:, vis_start:vis_end] = chunk_vis
@@ -126,6 +136,7 @@ class HybridPyTorchCudaDFT:
         v_coords,
         w_coords,
         max_memory_gb=20,
+        float64=False,
     ):
         """
         Compute inverse DFT with built-in chunking like the forward method
@@ -134,13 +145,15 @@ class HybridPyTorchCudaDFT:
         torch.cuda.empty_cache()
 
         # Convert to appropriate format
-        visibilities = visibilities.to(self.device).cdouble()
-        l_coords = l_coords.to(self.device).double()
-        m_coords = m_coords.to(self.device).double()
-        n_coords = n_coords.to(self.device).double()
-        u_coords = u_coords.to(self.device).double()
-        v_coords = v_coords.to(self.device).double()
-        w_coords = w_coords.to(self.device).double()
+        visibilities = visibilities.to(
+            self.device, torch.complex128 if float64 else torch.complex64
+        )
+        l_coords = l_coords.to(self.device, torch.float64 if float64 else torch.float32)
+        m_coords = m_coords.to(self.device, torch.float64 if float64 else torch.float32)
+        n_coords = n_coords.to(self.device, torch.float64 if float64 else torch.float32)
+        u_coords = u_coords.to(self.device, torch.float64 if float64 else torch.float32)
+        v_coords = v_coords.to(self.device, torch.float64 if float64 else torch.float32)
+        w_coords = w_coords.to(self.device, torch.float64 if float64 else torch.float32)
 
         # Handle batched or unbatched input
         if visibilities.dim() == 1:
@@ -161,7 +174,7 @@ class HybridPyTorchCudaDFT:
 
         # Pre-allocate output tensor for sky image
         sky_values = torch.zeros(
-            (batch_size, num_pixels), dtype=torch.complex128, device=self.device
+            (batch_size, num_pixels), dtype=visibilities.dtype, device=self.device
         )
 
         # Process pixel points in chunks
@@ -177,7 +190,7 @@ class HybridPyTorchCudaDFT:
             # Pre-allocate accumulators for this visibility chunk - more efficient
             sky_values_chunk = torch.zeros(
                 (batch_size, pixel_chunk_len),
-                dtype=torch.complex128,
+                dtype=visibilities.dtype,
                 device=self.device,
             )
 
@@ -194,7 +207,14 @@ class HybridPyTorchCudaDFT:
                 vis_chunk = visibilities[:, vis_start:vis_end]
 
                 sky_values_chunk += self.idft(
-                    vis_chunk, l_chunk, m_chunk, n_chunk, u_chunk, v_chunk, w_chunk
+                    vis_chunk,
+                    l_chunk,
+                    m_chunk,
+                    n_chunk,
+                    u_chunk,
+                    v_chunk,
+                    w_chunk,
+                    float64=True if float64 else False,
                 )
 
             # Add contribution to the sky values
@@ -337,10 +357,12 @@ class OptimizedPyTorchDFT:
                 w_term = torch.outer(w_chunk, n_chunk_minus_one)
 
                 # Combine terms and compute phase
-                # Using a single combined phase calculation avoids intermediate allocations
-                phase = -2.0 * torch.pi * (u_term + v_term + w_term)
+                # Using a single combined phase calculation avoids intermediate
+                # allocations
+                phase = -2.0 * pi * (u_term + v_term + w_term)
 
-                # Pre-compute trig functions (more efficient than complex exponentiation)
+                # Pre-compute trig functions (more efficient than complex
+                # exponentiation)
                 cos_phase = torch.cos(phase)
                 sin_phase = torch.sin(phase)
 
@@ -460,7 +482,7 @@ class ChunkedDFT(torch.nn.Module):
 
                 # Calculate phase
                 phase = (
-                    -2 * np.pi * (u_term + v_term + w_term)
+                    -2 * pi * (u_term + v_term + w_term)
                 )  # [chunk_vis, chunk_pixels]
                 exponential = torch.exp(1j * phase)  # [chunk_vis, chunk_pixels]
 
@@ -469,7 +491,8 @@ class ChunkedDFT(torch.nn.Module):
                     # Extract sky values for this chunk
                     sky_chunk = sky_values[b][pixel_start:pixel_end]  # [chunk_pixels]
 
-                    # Calculate contribution from this pixel chunk to all visibilities in current chunk
+                    # Calculate contribution from this pixel chunk to all
+                    # visibilities in current chunk
                     # [chunk_vis, chunk_pixels] × [chunk_pixels] → [chunk_vis]
                     vis_contribution = exponential @ sky_chunk
 
@@ -573,7 +596,7 @@ class ChunkedDFT_sincos(torch.nn.Module):
 
                 # Calculate phase
                 phase = (
-                    -2 * np.pi * (u_term + v_term + w_term)
+                    -2 * pi * (u_term + v_term + w_term)
                 )  # [chunk_vis, chunk_pixels]
 
                 # Calculate real and imaginary parts of the complex exponential
