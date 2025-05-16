@@ -345,7 +345,7 @@ class OptimizedPyTorchDFT:
                 # Combine terms and compute phase
                 # Using a single combined phase calculation avoids intermediate
                 # allocations
-                phase = -2.0 * torch.pi * (u_term + v_term + w_term)
+                phase = -2.0 * pi * (u_term + v_term + w_term)
 
                 # Pre-compute trig functions (more efficient than complex
                 # exponentiation)
