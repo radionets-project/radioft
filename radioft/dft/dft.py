@@ -2,6 +2,7 @@ from math import pi
 
 import torch
 
+from radioft.utils._typing import isdouble
 from radioft.utils.sizes import get_optimal_chunk_sizes
 
 from .utils import cuda_dft, cuda_idft
@@ -32,7 +33,7 @@ class HybridPyTorchCudaDFT:
         v_coords,
         w_coords,
         max_memory_gb=4,
-        float64=False,
+        dtype=torch.double,
     ):
         """
         Compute DFT with predictable performance
@@ -42,14 +43,14 @@ class HybridPyTorchCudaDFT:
 
         # Convert to appropriate format
         sky_values = sky_values.to(
-            self.device, torch.complex128 if float64 else torch.complex64
+            self.device, torch.complex128 if isdouble(dtype) else torch.complex64
         )
-        l_coords = l_coords.to(self.device, torch.float64 if float64 else torch.float32)
-        m_coords = m_coords.to(self.device, torch.float64 if float64 else torch.float32)
-        n_coords = n_coords.to(self.device, torch.float64 if float64 else torch.float32)
-        u_coords = u_coords.to(self.device, torch.float64 if float64 else torch.float32)
-        v_coords = v_coords.to(self.device, torch.float64 if float64 else torch.float32)
-        w_coords = w_coords.to(self.device, torch.float64 if float64 else torch.float32)
+        l_coords = l_coords.to(self.device, dtype)
+        m_coords = m_coords.to(self.device, dtype)
+        n_coords = n_coords.to(self.device, dtype)
+        u_coords = u_coords.to(self.device, dtype)
+        v_coords = v_coords.to(self.device, dtype)
+        w_coords = w_coords.to(self.device, dtype)
 
         # Handle batched or unbatched input
         if sky_values.dim() == 1:
@@ -110,7 +111,7 @@ class HybridPyTorchCudaDFT:
                     u_chunk,
                     v_chunk,
                     w_chunk,
-                    float64=True if float64 else False,
+                    dtype=dtype,
                 )
             # Store result for this visibility chunk
             visibilities[:, vis_start:vis_end] = chunk_vis
@@ -134,7 +135,7 @@ class HybridPyTorchCudaDFT:
         v_coords,
         w_coords,
         max_memory_gb=20,
-        float64=False,
+        dtype=torch.double,
     ):
         """
         Compute inverse DFT with built-in chunking like the forward method
@@ -144,14 +145,14 @@ class HybridPyTorchCudaDFT:
 
         # Convert to appropriate format
         visibilities = visibilities.to(
-            self.device, torch.complex128 if float64 else torch.complex64
+            self.device, torch.complex128 if isdouble(dtype) else torch.complex64
         )
-        l_coords = l_coords.to(self.device, torch.float64 if float64 else torch.float32)
-        m_coords = m_coords.to(self.device, torch.float64 if float64 else torch.float32)
-        n_coords = n_coords.to(self.device, torch.float64 if float64 else torch.float32)
-        u_coords = u_coords.to(self.device, torch.float64 if float64 else torch.float32)
-        v_coords = v_coords.to(self.device, torch.float64 if float64 else torch.float32)
-        w_coords = w_coords.to(self.device, torch.float64 if float64 else torch.float32)
+        l_coords = l_coords.to(self.device, dtype)
+        m_coords = m_coords.to(self.device, dtype)
+        n_coords = n_coords.to(self.device, dtype)
+        u_coords = u_coords.to(self.device, dtype)
+        v_coords = v_coords.to(self.device, dtype)
+        w_coords = w_coords.to(self.device, dtype)
 
         # Handle batched or unbatched input
         if visibilities.dim() == 1:
@@ -212,7 +213,7 @@ class HybridPyTorchCudaDFT:
                     u_chunk,
                     v_chunk,
                     w_chunk,
-                    float64=True if float64 else False,
+                    dtype=dtype,
                 )
 
             # Add contribution to the sky values

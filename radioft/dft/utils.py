@@ -7,6 +7,7 @@ from radioft.cuda.kernels import (
     compute_phase_matrix,
     compute_phase_matrix32,
 )
+from radioft.utils._typing import isdouble
 
 
 class CudaDFTFunction(Function):
@@ -20,7 +21,7 @@ class CudaDFTFunction(Function):
         u_coords,
         v_coords,
         w_coords,
-        float64=False,
+        dtype=torch.double,
     ):
         # Save for backward
         ctx.save_for_backward(
@@ -28,7 +29,7 @@ class CudaDFTFunction(Function):
         )
 
         # Get phase matrix from CUDA kernel
-        if float64:
+        if isdouble(dtype):
             phase_matrix = compute_phase_matrix(
                 l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
             )
@@ -55,12 +56,12 @@ class CudaDFTFunction(Function):
         num_vis = phase_matrix.shape[0]
         vis_real = torch.zeros(
             (batch_size, num_vis),
-            dtype=torch.float64 if float64 else torch.float32,
+            dtype=dtype,
             device=sky_values.device,
         )
         vis_imag = torch.zeros(
             (batch_size, num_vis),
-            dtype=torch.float64 if float64 else torch.float32,
+            dtype=dtype,
             device=sky_values.device,
         )
 
@@ -160,7 +161,7 @@ class CudaIDFTFunction(Function):
         u_coords,
         v_coords,
         w_coords,
-        float64=False,
+        dtype=torch.double,
     ):
         """
         Simplified forward pass that computes inverse DFT for a single chunk
@@ -196,7 +197,7 @@ class CudaIDFTFunction(Function):
         )
 
         # Compute phase matrix
-        if float64:
+        if isdouble(dtype):
             phase_matrix = compute_inverse_phase_matrix(
                 l_coords, m_coords, n_coords, u_coords, v_coords, w_coords
             )
@@ -323,7 +324,7 @@ def cuda_dft(
     u_coords,
     v_coords,
     w_coords,
-    float64=False,
+    dtype=torch.double,
 ):
     """
     CUDA-accelerated DFT without chunking - for use by HybridPyTorchCudaDFT
@@ -336,7 +337,7 @@ def cuda_dft(
         u_coords,
         v_coords,
         w_coords,
-        float64,
+        dtype,
     )
 
 
@@ -348,7 +349,7 @@ def cuda_idft(
     u_coords,
     v_coords,
     w_coords,
-    float64=False,
+    dtype=torch.double,
 ):
     """
     CUDA-accelerated IDFT without chunking - for use by HybridPyTorchCudaDFT
@@ -361,5 +362,5 @@ def cuda_idft(
         u_coords,
         v_coords,
         w_coords,
-        float64,
+        dtype,
     )
