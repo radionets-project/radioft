@@ -1,0 +1,11 @@
+### Dependency and Configuration Updates
+* Updated `.pre-commit-config.yaml` to include the `ruff` linter and updated versions of `isort` and `flake8`. Removed `black` from the configuration. 
+
+### CUDA Kernels and Bindings Enhancements
+* Added new CUDA kernels (`compute_phase_kernel32` and `compute_inverse_phase_kernel32`) in `radioft/cuda/kernels/cuda_phase_kernel32.cu` to support float32 precision for phase matrix computations.
+* Refactored existing kernels in `radioft/cuda/kernels/cuda_phase_kernel.cu` to improve code formatting and readability, including consistent formatting for function signatures and kernel launches. 
+* Added PyBind11 bindings in `radioft/cuda/cuda_bindings.cpp` to expose both float32 and float64 CUDA kernel functions to Python. 
+
+### PyTorch Integration and API Improvements
+* Updated `radioft/dft/dft.py` to add support for both float32 and float64 precision in the `HybridPyTorchCudaDFT` class. Introduced a `dtype` parameter in the constructor and `float64` flags in the `forward` and `inverse` methods to toggle precision. 
+* Modified tensor initialization and typecasting in `forward` and `inverse` methods to dynamically set precision based on the `float64` flag.
