@@ -12,14 +12,12 @@ class HybridPyTorchCudaDFT:
     Deterministic hybrid PyTorch-CUDA DFT implementation with performance optimizations
     """
 
-    def __init__(self, device="cuda", benchmark=False, dtype=torch.double):
+    def __init__(self, device="cuda", benchmark=False):
         self.device = device
 
         # Set deterministic algorithms for more consistent performance
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = benchmark
-
-        self.dtype = dtype
 
         self.dft = cuda_dft
         self.idft = cuda_idft
