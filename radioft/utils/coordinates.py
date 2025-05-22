@@ -29,25 +29,48 @@ def create_lm_grid(fov_arcsec, img_size, source_declination):
         dec
     ) * np.cos(rd[..., 0])
 
-    return torch.from_numpy(lm_grid.astype(np.float64))
+    return torch.from_numpy(lm_grid.astype(np.float64)), torch.from_numpy(
+        rd.astype(np.float64)
+    )
 
 
-def create_uvw_dense(N, fov, freq, earth_radius=R_earth.value):
+def create_uvw_dense(N, fov, freq, earth_radius=R_earth.value, oversampling_factor=4):
     fov_arc = np.deg2rad(fov / 3600, dtype=np.float128)
     delta = fov_arc ** (-1)
 
-    u_dense = np.arange(
-        start=-(N / 2) * delta,
-        stop=(N / 2) * delta,
-        step=delta,
-        dtype=np.float128,
-    )
+    # Calculate total grid size
+    grid_size = N * delta
 
-    v_dense = u_dense
+    # Handle the even/odd case for bin placement
+    if N % 2 == 0:  # Even number of bins
+        # Shift the center so pixel 0 is to the right and bottom of center
+        offset = delta / 2
+        bin_edges_x = np.linspace(
+            -grid_size / 2 - 1 + offset,
+            grid_size / 2 - 1 + offset,
+            (N * oversampling_factor) + 1,
+        )
+        bin_edges_y = np.linspace(
+            -grid_size / 2 + offset,
+            grid_size / 2 + offset,
+            (N * oversampling_factor) + 1,
+        )
+    else:  # Odd number of bins
+        bin_edges_x = np.linspace(-grid_size / 2, grid_size / 2, N + 1)
+        bin_edges_y = np.linspace(-grid_size / 2, grid_size / 2, N + 1)
 
-    uu, vv = np.meshgrid(u_dense, v_dense, indexing="ij")
+    # Create uniformly distributed coordinates for bin centers
+    bin_centers_x = bin_edges_x[:-1] + delta / 2
+    bin_centers_y = bin_edges_y[:-1] + delta / 2
+
+    # Create a 2D grid of bin center coordinates
+    xx, yy = np.meshgrid(bin_centers_x, bin_centers_y)
+    bin_centers = np.stack([xx, yy], axis=-1)
 
     # Calculate distance from center in uv-plane (in wavelengths)
+    uu = bin_centers[..., 0].ravel()
+    vv = bin_centers[..., 1].ravel()
+
     r_squared = uu**2 + vv**2
 
     wavelength = c.value / freq
