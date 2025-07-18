@@ -1,7 +1,7 @@
 import torch
 from torch.autograd import Function
 
-from radioft.cuda.kernels import (
+from radioft.cuda.kernels._libphase_kernel import (
     compute_inverse_phase_matrix,
     compute_inverse_phase_matrix32,
     compute_phase_matrix,
