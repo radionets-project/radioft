@@ -32,7 +32,7 @@ else()
     set(INSTALL_DIR ${SKBUILD_PROJECT_NAME})
 endif()
 
-python_add_library(_libphase_kernel MODULE 
+python_add_library(_libphase_kernel MODULE
     src/radioft/cuda/kernels/cuda_phase_kernel.cu
     src/radioft/cuda/kernels/cuda_phase_kernel32.cu
     src/radioft/cuda/cuda_bindings.cpp

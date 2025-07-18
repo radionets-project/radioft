@@ -2,10 +2,8 @@
 radioft - Fourier transform implementations for radio interferometry applications.
 """
 
+from . import dft, utils
 from .version import __version__
-from . import dft
-from . import utils
-
 
 try:
     import torch
