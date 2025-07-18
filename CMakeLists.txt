@@ -8,10 +8,6 @@ enable_language(CUDA)
 find_package(Python COMPONENTS Interpreter Development.Module REQUIRED)
 find_package(pybind11 REQUIRED)
 
-# set(CMAKE_CXX_STANDARD 17)
-# set(CMAKE_CUDA_STANDARD 17)
-# set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
 set(CMAKE_CUDA_ARCHITECTURES "70;75;80;86;89;90")
 
 execute_process(
