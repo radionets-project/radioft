@@ -51,11 +51,8 @@ class CupyFinufft:
         target_m = cp.asarray((m_coords / self.px_size), dtype=cp.float64)
         target_n = cp.asarray((n_coords / self.px_size), dtype=cp.float64)
 
-        result = (
-            self.ft(
-                source_u, source_v, source_w, c_values, target_l, target_m, target_n
-            )
-            / self.px_scaling
+        result = self.ft(
+            source_u, source_v, source_w, c_values, target_l, target_m, target_n
         )
         visibilities = result.get()
 
