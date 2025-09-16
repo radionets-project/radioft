@@ -64,12 +64,7 @@ def create_uvw_dense(N, fov, freq, earth_radius=R_earth.value, oversampling_fact
     bin_centers_y = bin_edges_y[:-1] + delta / 2
 
     # Create a 2D grid of bin center coordinates
-    xx, yy = np.meshgrid(bin_centers_x, bin_centers_y)
-    bin_centers = np.stack([xx, yy], axis=-1)
-
-    # Calculate distance from center in uv-plane (in wavelengths)
-    uu = bin_centers[..., 0].ravel()
-    vv = bin_centers[..., 1].ravel()
+    uu, vv = np.meshgrid(bin_centers_x, bin_centers_y)
 
     r_squared = uu**2 + vv**2
 
