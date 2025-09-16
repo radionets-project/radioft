@@ -6,7 +6,7 @@ import torch
 
 try:
     if torch.cuda.is_available():
-        from . import kernels
+        from . import kernels  # noqa: F401
 
         __all__ = ["kernels"]
 
