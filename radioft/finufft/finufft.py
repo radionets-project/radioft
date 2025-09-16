@@ -3,6 +3,7 @@ from math import pi
 
 import cufinufft
 import cupy as cp
+import torch
 
 
 class CupyFinufft:
@@ -30,6 +31,7 @@ class CupyFinufft:
         u_coords,
         v_coords,
         w_coords,
+        return_torch=False,
     ):
         """Docstring"""
         # Antenna coordinates (Fourier Domain - uvw coordinates)
@@ -54,7 +56,11 @@ class CupyFinufft:
         result = self.ft(
             source_u, source_v, source_w, c_values, target_l, target_m, target_n
         )
-        visibilities = result.get()
+
+        if return_torch:
+            visibilities = torch.as_tensor(result, device="cuda")
+        else:
+            visibilities = result.get()
 
         return visibilities
 
@@ -67,6 +73,7 @@ class CupyFinufft:
         u_coords,
         v_coords,
         w_coords,
+        return_torch=False,
     ):
         """Docstring"""
         # Antenna coordinates (Fourier Domain - uvw coordinates)
@@ -94,6 +101,10 @@ class CupyFinufft:
             )
             / self.px_scaling
         )
-        sky_intensities = result.get()
+
+        if return_torch:
+            sky_intensities = torch.as_tensor(result, device="cuda")
+        else:
+            sky_intensities = result.get()
 
         return sky_intensities
