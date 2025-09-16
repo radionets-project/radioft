@@ -16,9 +16,12 @@ class HybridPyTorchCudaDFT:
     def __init__(self, device="cuda", benchmark=False):
         self.device = device
 
-        # Set deterministic algorithms for more consistent performance
-        torch.backends.cudnn.deterministic = True
-        torch.backends.cudnn.benchmark = benchmark
+        if benchmark:
+            # Set deterministic algorithms for more consistent performance
+            torch.backends.cudnn.deterministic = True
+            torch.backends.cudnn.benchmark = benchmark
+            # Use fixed seed for more deterministic behavior
+            torch.manual_seed(0)
 
         self.dft = cuda_dft
         self.idft = cuda_idft
@@ -72,9 +75,6 @@ class HybridPyTorchCudaDFT:
         visibilities = torch.zeros(
             (batch_size, num_vis), dtype=sky_values.dtype, device=self.device
         )
-
-        # Use fixed seed for more deterministic behavior
-        torch.manual_seed(0)
 
         # Process visibility points in chunks
         for vis_start in range(0, num_vis, vis_chunk_size):
