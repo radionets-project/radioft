@@ -34,7 +34,7 @@ def create_lm_grid(fov_arcsec, img_size, source_declination):
     )
 
 
-def create_uvw_dense(N, fov, freq, earth_radius=R_earth.value, oversampling_factor=4):
+def create_uvw_dense(N, fov, freq, earth_radius=R_earth.value, oversampling_factor=1):
     fov_arc = np.deg2rad(fov / 3600, dtype=np.float128)
     delta = fov_arc ** (-1)
 
@@ -44,20 +44,27 @@ def create_uvw_dense(N, fov, freq, earth_radius=R_earth.value, oversampling_fact
     # Handle the even/odd case for bin placement
     if N % 2 == 0:  # Even number of bins
         # Shift the center so pixel 0 is to the right and bottom of center
-        offset = delta / 2
         bin_edges_x = np.linspace(
-            -grid_size / 2 - 1 + offset,
-            grid_size / 2 - 1 + offset,
+            -grid_size / 2 - 1,
+            grid_size / 2 - 1,
             (N * oversampling_factor) + 1,
         )
         bin_edges_y = np.linspace(
-            -grid_size / 2 + offset,
-            grid_size / 2 + offset,
+            -grid_size / 2,
+            grid_size / 2,
             (N * oversampling_factor) + 1,
         )
     else:  # Odd number of bins
-        bin_edges_x = np.linspace(-grid_size / 2, grid_size / 2, N + 1)
-        bin_edges_y = np.linspace(-grid_size / 2, grid_size / 2, N + 1)
+        bin_edges_x = np.linspace(
+            -grid_size / 2,
+            grid_size / 2,
+            (N * oversampling_factor) + 1,
+        )
+        bin_edges_y = np.linspace(
+            -grid_size / 2,
+            grid_size / 2,
+            (N * oversampling_factor) + 1,
+        )
 
     # Create uniformly distributed coordinates for bin centers
     bin_centers_x = bin_edges_x[:-1] + delta / 2
