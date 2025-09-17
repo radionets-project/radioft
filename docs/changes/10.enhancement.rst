@@ -1,1 +1,1 @@
-Added coordinate grids for `lm` and `uvw_dense` with Earth curvature handling in `w`  
+Added coordinate grids for `lm` and `uvw_dense` with Earth curvature handling in `w`
