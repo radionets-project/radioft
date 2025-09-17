@@ -7,8 +7,11 @@ def pytest_addoption(parser):
         "--run-large", action="store_true", default=False, help="run large memory tests"
     )
     parser.addoption(
-        "--max-memory-gb", action="store", default=4, type=int,
-        help="maximum memory to use for tests in GB"
+        "--max-memory-gb",
+        action="store",
+        default=4,
+        type=int,
+        help="maximum memory to use for tests in GB",
     )
 
 
