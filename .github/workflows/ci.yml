@@ -45,7 +45,7 @@ jobs:
 
       - name: Install doc dependencies
         run: |
-          sudo apt update --yes && sudo apt install --yes git 
+          sudo apt update --yes && sudo apt install --yes git
           pip install -U pip towncrier
 
       - name: Produce Changelog
