@@ -15,7 +15,3 @@ repos:
     hooks:
       - id: flake8
         args: [--max-line-length=88, "--extend-ignore=E203,E741"]
-  - repo: https://github.com/glotzerlab/pre-commit-clang-format
-    rev: v1.1.0
-    hooks:
-    - id: clang-format
