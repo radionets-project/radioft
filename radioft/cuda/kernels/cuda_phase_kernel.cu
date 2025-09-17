@@ -11,10 +11,10 @@
  * This kernel computes the phase matrix with double precision
  */
 __global__ void compute_high_precision_phase_kernel(
-    const double *__restrict__ l_coords, const double *__restrict__ m_coords,
-    const double *__restrict__ n_coords, const double *__restrict__ u_coords,
-    const double *__restrict__ v_coords, const double *__restrict__ w_coords,
-    double *__restrict__ phase_matrix, int num_vis, int num_pixels) {
+    const double* __restrict__ l_coords, const double* __restrict__ m_coords,
+    const double* __restrict__ n_coords, const double* __restrict__ u_coords,
+    const double* __restrict__ v_coords, const double* __restrict__ w_coords,
+    double* __restrict__ phase_matrix, int num_vis, int num_pixels) {
   // Each thread computes one element of the phase matrix
   int vis_idx = blockIdx.x * blockDim.x + threadIdx.x;
   int pixel_idx = blockIdx.y * blockDim.y + threadIdx.y;
@@ -26,7 +26,7 @@ __global__ void compute_high_precision_phase_kernel(
     double w = w_coords[vis_idx];
     double l = l_coords[pixel_idx];
     double m = m_coords[pixel_idx];
-    double n = n_coords[pixel_idx] - 1.0; // n - 1
+    double n = n_coords[pixel_idx] - 1.0;  // n - 1
 
     // Careful phase computation to maintain precision
     // Calculate components separately to minimize rounding errors
@@ -48,10 +48,9 @@ __global__ void compute_high_precision_phase_kernel(
 
 // Wrapper functions for PyTorch integration
 
-torch::Tensor
-compute_phase_matrix(torch::Tensor l_coords, torch::Tensor m_coords,
-                     torch::Tensor n_coords, torch::Tensor u_coords,
-                     torch::Tensor v_coords, torch::Tensor w_coords) {
+torch::Tensor compute_phase_matrix(
+    torch::Tensor l_coords, torch::Tensor m_coords, torch::Tensor n_coords,
+    torch::Tensor u_coords, torch::Tensor v_coords, torch::Tensor w_coords) {
   // Validate inputs
   TORCH_CHECK(l_coords.is_cuda(), "l_coords must be a CUDA tensor");
   TORCH_CHECK(m_coords.is_cuda(), "m_coords must be a CUDA tensor");
@@ -89,10 +88,10 @@ compute_phase_matrix(torch::Tensor l_coords, torch::Tensor m_coords,
  * and POSITIVE sign for inverse DFT
  */
 __global__ void compute_high_precision_inverse_phase_kernel(
-    const double *__restrict__ l_coords, const double *__restrict__ m_coords,
-    const double *__restrict__ n_coords, const double *__restrict__ u_coords,
-    const double *__restrict__ v_coords, const double *__restrict__ w_coords,
-    double *__restrict__ phase_matrix, int num_vis, int num_pixels) {
+    const double* __restrict__ l_coords, const double* __restrict__ m_coords,
+    const double* __restrict__ n_coords, const double* __restrict__ u_coords,
+    const double* __restrict__ v_coords, const double* __restrict__ w_coords,
+    double* __restrict__ phase_matrix, int num_vis, int num_pixels) {
   // Each thread computes one element of the phase matrix
   int vis_idx = blockIdx.x * blockDim.x + threadIdx.x;
   int pixel_idx = blockIdx.y * blockDim.y + threadIdx.y;
@@ -104,7 +103,7 @@ __global__ void compute_high_precision_inverse_phase_kernel(
     double w = w_coords[vis_idx];
     double l = l_coords[pixel_idx];
     double m = m_coords[pixel_idx];
-    double n = n_coords[pixel_idx] - 1.0; // n - 1
+    double n = n_coords[pixel_idx] - 1.0;  // n - 1
 
     // Careful phase computation to maintain precision
     double ul = u * l;
@@ -124,10 +123,9 @@ __global__ void compute_high_precision_inverse_phase_kernel(
 
 // Adding an inverse DFT version of the phase kernel
 
-torch::Tensor
-compute_inverse_phase_matrix(torch::Tensor l_coords, torch::Tensor m_coords,
-                             torch::Tensor n_coords, torch::Tensor u_coords,
-                             torch::Tensor v_coords, torch::Tensor w_coords) {
+torch::Tensor compute_inverse_phase_matrix(
+    torch::Tensor l_coords, torch::Tensor m_coords, torch::Tensor n_coords,
+    torch::Tensor u_coords, torch::Tensor v_coords, torch::Tensor w_coords) {
   // Input validation identical to the forward version
   TORCH_CHECK(l_coords.is_cuda(), "l_coords must be a CUDA tensor");
   TORCH_CHECK(m_coords.is_cuda(), "m_coords must be a CUDA tensor");

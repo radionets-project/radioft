@@ -11,10 +11,10 @@
  * This kernel computes the phase matrix with float32 precision
  */
 __global__ void compute_phase_kernel32(
-    const float *__restrict__ l_coords, const float *__restrict__ m_coords,
-    const float *__restrict__ n_coords, const float *__restrict__ u_coords,
-    const float *__restrict__ v_coords, const float *__restrict__ w_coords,
-    float *__restrict__ phase_matrix, int num_vis, int num_pixels) {
+    const float* __restrict__ l_coords, const float* __restrict__ m_coords,
+    const float* __restrict__ n_coords, const float* __restrict__ u_coords,
+    const float* __restrict__ v_coords, const float* __restrict__ w_coords,
+    float* __restrict__ phase_matrix, int num_vis, int num_pixels) {
   // Each thread computes one element of the phase matrix
   int vis_idx = blockIdx.x * blockDim.x + threadIdx.x;
   int pixel_idx = blockIdx.y * blockDim.y + threadIdx.y;
@@ -26,7 +26,7 @@ __global__ void compute_phase_kernel32(
     float w = w_coords[vis_idx];
     float l = l_coords[pixel_idx];
     float m = m_coords[pixel_idx];
-    float n = n_coords[pixel_idx] - 1.0; // n - 1
+    float n = n_coords[pixel_idx] - 1.0;  // n - 1
 
     // Careful phase computation to maintain precision
     // Calculate components separately to minimize rounding errors
@@ -48,10 +48,9 @@ __global__ void compute_phase_kernel32(
 
 // Wrapper functions for PyTorch integration
 
-torch::Tensor
-compute_phase_matrix32(torch::Tensor l_coords, torch::Tensor m_coords,
-                       torch::Tensor n_coords, torch::Tensor u_coords,
-                       torch::Tensor v_coords, torch::Tensor w_coords) {
+torch::Tensor compute_phase_matrix32(
+    torch::Tensor l_coords, torch::Tensor m_coords, torch::Tensor n_coords,
+    torch::Tensor u_coords, torch::Tensor v_coords, torch::Tensor w_coords) {
   // Validate inputs
   TORCH_CHECK(l_coords.is_cuda(), "l_coords must be a CUDA tensor");
   TORCH_CHECK(m_coords.is_cuda(), "m_coords must be a CUDA tensor");
@@ -89,10 +88,10 @@ compute_phase_matrix32(torch::Tensor l_coords, torch::Tensor m_coords,
  * and POSITIVE sign for inverse DFT
  */
 __global__ void compute_inverse_phase_kernel32(
-    const float *__restrict__ l_coords, const float *__restrict__ m_coords,
-    const float *__restrict__ n_coords, const float *__restrict__ u_coords,
-    const float *__restrict__ v_coords, const float *__restrict__ w_coords,
-    float *__restrict__ phase_matrix, int num_vis, int num_pixels) {
+    const float* __restrict__ l_coords, const float* __restrict__ m_coords,
+    const float* __restrict__ n_coords, const float* __restrict__ u_coords,
+    const float* __restrict__ v_coords, const float* __restrict__ w_coords,
+    float* __restrict__ phase_matrix, int num_vis, int num_pixels) {
   // Each thread computes one element of the phase matrix
   int vis_idx = blockIdx.x * blockDim.x + threadIdx.x;
   int pixel_idx = blockIdx.y * blockDim.y + threadIdx.y;
@@ -104,7 +103,7 @@ __global__ void compute_inverse_phase_kernel32(
     float w = w_coords[vis_idx];
     float l = l_coords[pixel_idx];
     float m = m_coords[pixel_idx];
-    float n = n_coords[pixel_idx] - 1.0; // n - 1
+    float n = n_coords[pixel_idx] - 1.0;  // n - 1
 
     // Careful phase computation to maintain precision
     float ul = u * l;
@@ -124,10 +123,9 @@ __global__ void compute_inverse_phase_kernel32(
 
 // Adding an inverse DFT version of the phase kernel
 
-torch::Tensor
-compute_inverse_phase_matrix32(torch::Tensor l_coords, torch::Tensor m_coords,
-                               torch::Tensor n_coords, torch::Tensor u_coords,
-                               torch::Tensor v_coords, torch::Tensor w_coords) {
+torch::Tensor compute_inverse_phase_matrix32(
+    torch::Tensor l_coords, torch::Tensor m_coords, torch::Tensor n_coords,
+    torch::Tensor u_coords, torch::Tensor v_coords, torch::Tensor w_coords) {
   // Input validation identical to the forward version
   TORCH_CHECK(l_coords.is_cuda(), "l_coords must be a CUDA tensor");
   TORCH_CHECK(m_coords.is_cuda(), "m_coords must be a CUDA tensor");
