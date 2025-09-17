@@ -1,21 +1,31 @@
+ci:
+  autoupdate_schedule: monthly
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: "v6.0.0"
+    hooks:
+      - id: check-added-large-files
+      - id: check-case-conflict
+      - id: check-merge-conflict
+      - id: check-symlinks
+      - id: check-yaml
+      - id: debug-statements
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: name-tests-test
+        args: ["--pytest-test-first"]
+      - id: requirements-txt-fixer
+      - id: trailing-whitespace
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.11
+    rev: "v0.12.11"
     hooks:
-      - id: ruff
-        args: [--fix, --show-fixes]
       - id: ruff-format
-  - repo: https://github.com/pycqa/isort
-    rev: 6.0.1
+      - id: ruff-check
+        args: ["--fix", "--show-fixes"]
+  - repo: https://github.com/cpplint/cpplint
+    rev: 2.0.0
     hooks:
-      - id: isort
-        args: ["--profile", "black", "--filter-files"]
-  - repo: https://github.com/PyCQA/flake8
-    rev: 7.3.0
-    hooks:
-      - id: flake8
-        args: [--max-line-length=88, "--extend-ignore=E203,E741"]
-  - repo: https://github.com/glotzerlab/pre-commit-clang-format
-    rev: v1.1.0
-    hooks:
-    - id: clang-format
+      - id: cpplint
+        args:
+          - --filter=-whitespace/line_length,-whitespace/parens,-legal/copyright
