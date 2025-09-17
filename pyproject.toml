@@ -39,20 +39,24 @@ dependencies = [
   "tqdm",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 tests = ["h5py", "pytest >= 7.0", "pytest-cov", "tomli"]
+
+dev = [
+  {include-group = "tests"}
+]
 
 
 [tool.setuptools_scm]
-write_to = "radioft/_version.py"
+write_to = "src/radioft/_version.py"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
 
 [tool.coverage.run]
 omit = [
-  "radioft/version.py",
-  "radioft/_version.py",
+  "src/radioft/version.py",
+  "src/radioft/_version.py",
   "docs/*",
   "**/__init__.py",
   "tests/*",
