@@ -33,7 +33,7 @@ if cuda_available:
 
     # Find all CUDA source files in the radioft/cuda directory
     # cuda_sources = [str(p) for p in Path("radioft/cuda").glob("**/*.cu")]
-    cuda_dir = Path("radioft/cuda")
+    cuda_dir = Path("src/radioft/cuda")
     cuda_sources = list(cuda_dir.glob("**/*.cu"))
     cuda_sources.append(cuda_dir / "cuda_bindings.cpp")
 
