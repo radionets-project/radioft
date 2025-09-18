@@ -5,6 +5,8 @@ from math import pi
 import cufinufft
 import cupy as cp
 import torch
+import numpy as np
+from operator import itemgetter
 
 
 class CupyFinufft:
@@ -16,7 +18,7 @@ class CupyFinufft:
         fov_arcsec,
         eps=1e-12,
     ):
-        """Docstring"""
+        """Wraper to use Finufft Type 3d3 for radio interferometry data."""
         self.px_size = ((fov_arcsec / 3600) * pi / 180) / image_size
         self.px_scaling = image_size**2
 
@@ -56,18 +58,23 @@ class CupyFinufft:
             dtype=cp.float64,
         )
 
-        outside_bounds = (
-            (target_u <= -pi)
-            & (target_u > pi)
-            & (target_v <= -pi)
-            & (target_v > pi)
-            & (target_w <= -pi)
-            & (target_w > pi)
+        outside_bounds = np.array(
+            [
+                (target_u <= -pi) | (target_u > pi),
+                (target_v <= -pi) | (target_v > pi),
+                (target_w <= -pi) | (target_w > pi),
+            ]
         )
+        coord_outside = np.where(np.any(outside_bounds, axis=1))[0]
+        uvw_map = {
+            0: "u",
+            1: "v",
+            2: "w",
+        }
         if outside_bounds.any():
             warnings.warn(
-                "Some of the uvw coordinates lie outside the constructed image."
-                "This can lead to cufinufft errors."
+                f"Some of the {', '.join(itemgetter(*coord_outside)(uvw_map))} coordinates "
+                "lie outside the constructed image. This can lead to cufinufft errors."
             )
 
         # Values at source position (Source intensities)
@@ -115,19 +122,25 @@ class CupyFinufft:
             2 * pi * (w_coords.flatten() * self.px_size), dtype=cp.float64
         )
 
-        outside_bounds = (
-            (source_u <= -pi)
-            & (source_u > pi)
-            & (source_v <= -pi)
-            & (source_v > pi)
-            & (source_w <= -pi)
-            & (source_w > pi)
+        outside_bounds = np.array(
+            [
+                (source_u <= -pi) | (source_u > pi),
+                (source_v <= -pi) | (source_v > pi),
+                (source_w <= -pi) | (source_w > pi),
+            ]
         )
+        coord_outside = np.where(np.any(outside_bounds, axis=1))[0]
+        uvw_map = {
+            0: "u",
+            1: "v",
+            2: "w",
+        }
         if outside_bounds.any():
             warnings.warn(
-                "Some of the uvw coordinates lie outside the constructed image."
-                "This can lead to cufinufft errors."
+                f"Some of the {', '.join(itemgetter(*coord_outside)(uvw_map))} coordinates "
+                "lie outside the constructed image. This can lead to cufinufft errors."
             )
+
         # Fourier coeficients at antenna positions (Visibilities)
         c_values = cp.asarray(visibilities.flatten(), dtype=cp.complex128)
 
