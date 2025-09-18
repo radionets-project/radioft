@@ -66,9 +66,9 @@ class CupyFinufft:
 
         outside_bounds = np.array(
             [
-                (target_u <= -pi) | (target_u > pi),
-                (target_v <= -pi) | (target_v > pi),
-                (target_w <= -pi) | (target_w > pi),
+                (target_u.get() <= -pi) | (target_u.get() > pi),
+                (target_v.get() <= -pi) | (target_v.get() > pi),
+                (target_w.get() <= -pi) | (target_w.get() > pi),
             ]
         )
         coord_outside = np.where(np.any(outside_bounds, axis=1))[0]
@@ -128,9 +128,9 @@ class CupyFinufft:
 
         outside_bounds = np.array(
             [
-                (source_u <= -pi) | (source_u > pi),
-                (source_v <= -pi) | (source_v > pi),
-                (source_w <= -pi) | (source_w > pi),
+                (source_u.get() <= -pi) | (source_u.get() > pi),
+                (source_v.get() <= -pi) | (source_v.get() > pi),
+                (source_w.get() <= -pi) | (source_w.get() > pi),
             ]
         )
         coord_outside = np.where(np.any(outside_bounds, axis=1))[0]
