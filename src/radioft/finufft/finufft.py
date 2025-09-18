@@ -1,12 +1,18 @@
 import warnings
 from functools import partial
 from math import pi
+from operator import itemgetter
 
 import cufinufft
 import cupy as cp
-import torch
 import numpy as np
-from operator import itemgetter
+import torch
+
+UVW_MAP = {
+    0: "u",
+    1: "v",
+    2: "w",
+}
 
 
 class CupyFinufft:
@@ -66,15 +72,13 @@ class CupyFinufft:
             ]
         )
         coord_outside = np.where(np.any(outside_bounds, axis=1))[0]
-        uvw_map = {
-            0: "u",
-            1: "v",
-            2: "w",
-        }
+
         if outside_bounds.any():
             warnings.warn(
-                f"Some of the {', '.join(itemgetter(*coord_outside)(uvw_map))} coordinates "
-                "lie outside the constructed image. This can lead to cufinufft errors."
+                f"Some of the {', '.join(itemgetter(*coord_outside)(UVW_MAP))} "
+                "coordinates lie outside the constructed image. This can lead to "
+                "cufinufft errors.",
+                stacklevel=2,
             )
 
         # Values at source position (Source intensities)
@@ -130,15 +134,13 @@ class CupyFinufft:
             ]
         )
         coord_outside = np.where(np.any(outside_bounds, axis=1))[0]
-        uvw_map = {
-            0: "u",
-            1: "v",
-            2: "w",
-        }
+
         if outside_bounds.any():
             warnings.warn(
-                f"Some of the {', '.join(itemgetter(*coord_outside)(uvw_map))} coordinates "
-                "lie outside the constructed image. This can lead to cufinufft errors."
+                f"Some of the {', '.join(itemgetter(*coord_outside)(UVW_MAP))} "
+                "coordinates lie outside the constructed image. This can lead to "
+                "cufinufft errors.",
+                stacklevel=2,
             )
 
         # Fourier coeficients at antenna positions (Visibilities)

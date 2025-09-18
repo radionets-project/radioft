@@ -30,7 +30,7 @@ classifiers = [
   "Development Status :: 4 - Beta",
 ]
 
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 dependencies = [
   "pre-commit",
@@ -41,20 +41,24 @@ dependencies = [
   "cufinufft",
 ]
 
-[project.optional-dependencies]
+[dependency-groups]
 tests = ["h5py", "pytest >= 7.0", "pytest-cov", "tomli"]
+
+dev = [
+  {include-group = "tests"}
+]
 
 
 [tool.setuptools_scm]
-write_to = "radioft/_version.py"
+write_to = "src/radioft/_version.py"
 
 [tool.setuptools.packages.find]
-where = ["."]
+where = ["src"]
 
 [tool.coverage.run]
 omit = [
-  "radioft/version.py",
-  "radioft/_version.py",
+  "src/radioft/version.py",
+  "src/radioft/_version.py",
   "docs/*",
   "**/__init__.py",
   "tests/*",
@@ -98,3 +102,35 @@ output = "coverage.xml"
     [[tool.towncrier.section]]
         name = ""
         path = ""
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+extend-exclude = ["tests"]
+
+[tool.ruff.lint]
+extend-select = [
+  "I",  # isort
+  "E", # pycodestyle
+  "F", # Pyflakes
+  "UP", # pyupgrade
+  "B", # flake8-bugbear
+  "SIM", # flake8-simplify
+]
+ignore = ["B905"]
+
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.per-file-ignores]
+"examples/**" = ["I"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+skip-magic-trailing-comma = false
+docstring-code-format = true
+
+[tool.ruff.lint.isort]
+known-first-party = ["radioft"]
