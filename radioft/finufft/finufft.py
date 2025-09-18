@@ -56,7 +56,15 @@ class CupyFinufft:
             dtype=cp.float64,
         )
 
-        if target_u:
+        outside_bounds = (
+            (target_u <= -pi)
+            & (target_u > pi)
+            & (target_v <= -pi)
+            & (target_v > pi)
+            & (target_w <= -pi)
+            & (target_w > pi)
+        )
+        if outside_bounds.any():
             warnings.warn(
                 "Some of the uvw coordinates lie outside the constructed image."
                 "This can lead to cufinufft errors."
