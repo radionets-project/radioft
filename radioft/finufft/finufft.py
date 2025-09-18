@@ -1,3 +1,4 @@
+import warnings
 from functools import partial
 from math import pi
 
@@ -13,7 +14,7 @@ class CupyFinufft:
         self,
         image_size,
         fov_arcsec,
-        eps=1e-15,
+        eps=1e-12,
     ):
         """Docstring"""
         self.px_size = ((fov_arcsec / 3600) * pi / 180) / image_size
@@ -54,6 +55,12 @@ class CupyFinufft:
             2 * pi * (w_coords.flatten() * self.px_size),
             dtype=cp.float64,
         )
+
+        if target_u:
+            warnings.warn(
+                "Some of the uvw coordinates lie outside the constructed image."
+                "This can lead to cufinufft errors."
+            )
 
         # Values at source position (Source intensities)
         c_values = cp.asarray(sky_values.flatten(), dtype=cp.complex128)
