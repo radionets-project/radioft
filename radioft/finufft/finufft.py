@@ -13,14 +13,14 @@ class CupyFinufft:
         self,
         image_size,
         fov_arcsec,
-        eps=1e-12,
+        eps=1e-15,
     ):
         """Docstring"""
         self.px_size = ((fov_arcsec / 3600) * pi / 180) / image_size
         self.px_scaling = image_size**2
 
-        self.ft = partial(cufinufft.nufft3d3, isign=1, eps=eps)
-        self.ift = partial(cufinufft.nufft3d3, isign=-1, eps=eps)
+        self.ft = partial(cufinufft.nufft3d3, isign=-1, eps=eps)
+        self.ift = partial(cufinufft.nufft3d3, isign=+1, eps=eps)
 
     def nufft(
         self,
@@ -33,28 +33,39 @@ class CupyFinufft:
         w_coords,
         return_torch=False,
     ):
-        """Docstring"""
-        # Antenna coordinates (Fourier Domain - uvw coordinates)
-        source_u = cp.asarray(
-            2 * pi * (u_coords.flatten() * self.px_size), dtype=cp.float64
-        ) % (2 * pi)
-        source_v = cp.asarray(
-            2 * pi * (v_coords.flatten() * self.px_size), dtype=cp.float64
-        ) % (2 * pi)
-        source_w = cp.asarray(
-            2 * pi * (w_coords.flatten() * self.px_size), dtype=cp.float64
-        ) % (2 * pi)
+        """Calculate the fast Fourier transform with non-uniform source
+        and non-uniform target coordinates.
+        """
+        # Sky coordinates (Image domain - lmn coordinates)
+        source_l = cp.asarray((l_coords / self.px_size), dtype=cp.float64)
+        source_m = cp.asarray((m_coords / self.px_size), dtype=cp.float64)
+        source_n = cp.asarray(((n_coords - 1) / self.px_size), dtype=cp.float64)
 
-        # Values at source points (Source intensities)
+        # Antenna coordinates (Fourier Domain - uvw coordinates)
+        target_u = cp.asarray(
+            2 * pi * (u_coords.flatten() * self.px_size),
+            dtype=cp.float64,
+        )
+        target_v = cp.asarray(
+            2 * pi * (v_coords.flatten() * self.px_size),
+            dtype=cp.float64,
+        )
+        target_w = cp.asarray(
+            2 * pi * (w_coords.flatten() * self.px_size),
+            dtype=cp.float64,
+        )
+
+        # Values at source position (Source intensities)
         c_values = cp.asarray(sky_values.flatten(), dtype=cp.complex128)
 
-        # Target coordinates (Image domain - lmn coordinates)
-        target_l = cp.asarray((l_coords / self.px_size), dtype=cp.float64)
-        target_m = cp.asarray((m_coords / self.px_size), dtype=cp.float64)
-        target_n = cp.asarray((n_coords / self.px_size), dtype=cp.float64)
-
         result = self.ft(
-            source_u, source_v, source_w, c_values, target_l, target_m, target_n
+            source_l,
+            source_m,
+            source_n,
+            c_values,
+            target_u,
+            target_v,
+            target_w,
         )
 
         if return_torch:
@@ -75,28 +86,30 @@ class CupyFinufft:
         w_coords,
         return_torch=False,
     ):
-        """Docstring"""
+        """Calculate the inverse fast Fourier transform with non-uniform source
+        and non-uniform target coordinates.
+        """
         # Antenna coordinates (Fourier Domain - uvw coordinates)
         source_u = cp.asarray(
             2 * pi * (u_coords.flatten() * self.px_size), dtype=cp.float64
-        ) % (2 * pi)
+        )
         source_v = cp.asarray(
             2 * pi * (v_coords.flatten() * self.px_size), dtype=cp.float64
-        ) % (2 * pi)
+        )
         source_w = cp.asarray(
             2 * pi * (w_coords.flatten() * self.px_size), dtype=cp.float64
-        ) % (2 * pi)
+        )
 
-        # Values at source points (Source intensities)
+        # Fourier coeficients at antenna positions (Visibilities)
         c_values = cp.asarray(visibilities.flatten(), dtype=cp.complex128)
 
-        # Target coordinates (Image domain - lmn coordinates)
+        # Sky coordinates (Image domain - lmn coordinates)
         target_l = cp.asarray((l_coords / self.px_size), dtype=cp.float64)
         target_m = cp.asarray((m_coords / self.px_size), dtype=cp.float64)
-        target_n = cp.asarray((n_coords / self.px_size), dtype=cp.float64)
+        target_n = cp.asarray(((n_coords - 1) / self.px_size), dtype=cp.float64)
 
         result = (
-            self.ft(
+            self.ift(
                 source_u, source_v, source_w, c_values, target_l, target_m, target_n
             )
             / self.px_scaling
