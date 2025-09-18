@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools>=64", "setuptools_scm[toml]>=8", "wheel", "torch>=2.7.0", "numpy>=1.17.0"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling", "hatch-vcs", "wheel", "torch>=2.7.0", "numpy>=1.17.0"]
+build-backend = "hatchling.build"
 
 [project]
 name = "radioft"
@@ -17,10 +17,9 @@ maintainers = [
   { name = "Anno Knierim", email = "anno.knierim@tu-dortmund.de" },
   { name = "Tom Groß", email = "tom.gross@tu-dortmund.de" },
 ]
-license = { text = "MIT" }
+license = "MIT"
 classifiers = [
   "Intended Audience :: Science/Research",
-  "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
@@ -48,12 +47,17 @@ dev = [
   {include-group = "tests"}
 ]
 
+[tool.hatch.build.targets.wheel]
+include = ["src/radioft"]
 
-[tool.setuptools_scm]
-write_to = "src/radioft/_version.py"
+[tool.hatch.build.targets.wheel.sources]
+"src/radioft" = "radioft"
 
-[tool.setuptools.packages.find]
-where = ["src"]
+[tool.hatch.version]
+source = "vcs"
+
+[tool.hatch.build.hooks.vcs]
+version-file = "src/radioft/_version.py"
 
 [tool.coverage.run]
 omit = [
