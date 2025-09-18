@@ -1,12 +1,12 @@
 import warnings
 from functools import partial
 from math import pi
+from operator import itemgetter
 
 import cufinufft
 import cupy as cp
-import torch
 import numpy as np
-from operator import itemgetter
+import torch
 
 
 class CupyFinufft:
