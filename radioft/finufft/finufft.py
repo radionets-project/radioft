@@ -115,6 +115,19 @@ class CupyFinufft:
             2 * pi * (w_coords.flatten() * self.px_size), dtype=cp.float64
         )
 
+        outside_bounds = (
+            (source_u <= -pi)
+            & (source_u > pi)
+            & (source_v <= -pi)
+            & (source_v > pi)
+            & (source_w <= -pi)
+            & (source_w > pi)
+        )
+        if outside_bounds.any():
+            warnings.warn(
+                "Some of the uvw coordinates lie outside the constructed image."
+                "This can lead to cufinufft errors."
+            )
         # Fourier coeficients at antenna positions (Visibilities)
         c_values = cp.asarray(visibilities.flatten(), dtype=cp.complex128)
 
