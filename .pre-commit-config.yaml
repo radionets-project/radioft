@@ -18,13 +18,13 @@ repos:
       - id: trailing-whitespace
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: "v0.12.11"
+    rev: "v0.13.3"
     hooks:
       - id: ruff-format
       - id: ruff-check
         args: ["--fix", "--show-fixes"]
   - repo: https://github.com/cpplint/cpplint
-    rev: 2.0.0
+    rev: 2.0.2
     hooks:
       - id: cpplint
         args:
