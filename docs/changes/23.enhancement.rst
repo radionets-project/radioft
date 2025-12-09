@@ -1,7 +1,0 @@
-Added coordinate grids for `lm` and `uvw_dense` with Earth curvature handling in `w`
-
-Added `FINUFFTAutograd` and `IFINUFFTAutograd` custom PyTorch autograd functions to enable differentiable NUFFT and inverse NUFFT, using the adjoint operation for backward passes. Exposed these via `apply_nufft_differentiable` and `apply_inufft_differentiable` functions.
-
-Introduced `cupy_to_torch` and `torch_to_cupy` utility functions for efficient conversion between CuPy arrays and PyTorch tensors using DLPack, ensuring all data stays on the GPU.
-
-Added the `_compute_visibility_weights_and_indices` method to count how many visibilities map to each pixel, and used these weights to normalize visibilities in the inverse NUFFT. This ensures correct averaging when multiple visibilities fall into the same bin.
