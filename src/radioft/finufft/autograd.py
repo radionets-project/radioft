@@ -26,7 +26,6 @@ class FINUFFTAutograd(torch.autograd.Function):
                 uvw_coords[0],
                 uvw_coords[1],
                 uvw_coords[2],
-                return_torch=True,
             )
 
         return vis
@@ -49,7 +48,6 @@ class FINUFFTAutograd(torch.autograd.Function):
                 uvw_coords[0],
                 uvw_coords[1],
                 uvw_coords[2],
-                return_torch=True,
             )
 
             # Take real part since input was real
