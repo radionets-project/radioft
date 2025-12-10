@@ -35,7 +35,7 @@ dependencies = [
   "toml",
   "torch>=2.7.0",
   "tqdm",
-  "cupy>=12.0",
+  "cupy-cuda12x",
   "cufinufft",
 ]
 
