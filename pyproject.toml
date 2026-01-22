@@ -32,7 +32,6 @@ classifiers = [
 requires-python = ">=3.11"
 
 dependencies = [
-  "pre-commit",
   "toml",
   "torch>=2.7.0",
   "tqdm",
@@ -44,6 +43,7 @@ dependencies = [
 tests = ["h5py", "pytest >= 7.0", "pytest-cov", "tomli"]
 
 dev = [
+  "pre-commit",
   {include-group = "tests"}
 ]
 
