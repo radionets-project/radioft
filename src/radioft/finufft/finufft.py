@@ -222,7 +222,7 @@ class CupyFinufft:
         coord_outside = cp.where(cp.any(outside_bounds, axis=1))[0]
 
         if outside_bounds.any():
-            warnings.warning(
+            warnings.warn(
                 f"Some of the {', '.join(itemgetter(*coord_outside.get())(uvw_map))} "
                 "coordinates lie outside the constructed image. This can lead to "
                 "cufinufft errors."
