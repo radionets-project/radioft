@@ -1,0 +1,12 @@
+Replaced `array.from_dlpack` calls with `cp.asarray` or `torch.as_tensor` to utilize zero-copy data exchange via `__cuda_array_interface__`
+
+    - The main reason for the `DLPack` data exchange removal is that `DLPack` sometimes may lead to a core dump `free(): double free detected in tcache 2`, likely caused by array/tensor destructors called from both CuPy and PyTorch
+    - Since the method is only ever used with GPUs in mind, only GPU tensors can be passed; CPU tensors will not work and should not be considered further
+
+Put `cufinufft.nufft3d3` call inside try-except block to catch `Error setting non-uniform pounts` runtime error likely caused by OOM exception but not reported as such
+
+    - If the runtime error is raised, the `nufft` method now raises a `torch.cuda.OutOfMemoryError` which causes the adaptive batch size handler of pyvisgen to reduce the batch size, repeating until the cuFINUFFT works
+
+Explicitly converted CuPy arrays to contiguous arrays in memory as per cuFINUFFT requirement
+
+Removed obsolete $[-\pi, \pi)$ boundaries
