@@ -1,27 +1,10 @@
 import warnings
 from functools import partial
 from math import pi
-from operator import itemgetter
 
 import cufinufft
 import cupy as cp
 import torch
-
-uvw_map = {
-    0: "u",
-    1: "v",
-    2: "w",
-}
-
-
-def cupy_to_torch(x_cp):
-    """CuPy array -> Torch tensor on GPU (Zero-Copy via DLPack)"""
-    return torch.utils.dlpack.from_dlpack(x_cp.toDlpack())
-
-
-def torch_to_cupy(x_torch):
-    """Torch tensor -> CuPy array on GPU (Zero-Copy via DLPack)"""
-    return cp.fromDlpack(torch.utils.dlpack.to_dlpack(x_torch))
 
 
 class CupyFinufft:
@@ -132,53 +115,55 @@ class CupyFinufft:
         and non-uniform target coordinates.
         """
         # Sky coordinates (Image domain - lmn coordinates)
-        source_l = torch_to_cupy(l_coords / self.px_size).astype(cp.float64)
-        source_m = torch_to_cupy(m_coords / self.px_size).astype(cp.float64)
-        source_n = torch_to_cupy((n_coords - 1) / self.px_size).astype(cp.float64)
+        source_l = cp.asarray(l_coords / self.px_size).astype(cp.float64)
+        source_m = cp.asarray(m_coords / self.px_size).astype(cp.float64)
+        source_n = cp.asarray((n_coords - 1) / self.px_size).astype(cp.float64)
 
         # Antenna coordinates (Fourier Domain - uvw coordinates)
-        target_u = torch_to_cupy(2 * pi * (u_coords.flatten() * self.px_size)).astype(
+        target_u = cp.asarray(2 * pi * (u_coords.flatten() * self.px_size)).astype(
             cp.float64
         )
-        target_v = torch_to_cupy(2 * pi * (v_coords.flatten() * self.px_size)).astype(
+        target_v = cp.asarray(2 * pi * (v_coords.flatten() * self.px_size)).astype(
             cp.float64
         )
-        target_w = torch_to_cupy(2 * pi * (w_coords.flatten() * self.px_size)).astype(
+        target_w = cp.asarray(2 * pi * (w_coords.flatten() * self.px_size)).astype(
             cp.float64
         )
-
-        outside_bounds = cp.array(
-            [
-                (target_u <= -cp.pi) | (target_u > cp.pi),
-                (target_v <= -cp.pi) | (target_v > cp.pi),
-                (target_w <= -cp.pi) | (target_w > cp.pi),
-            ]
-        )
-        coord_outside = cp.where(cp.any(outside_bounds, axis=1))[0]
-        if outside_bounds.any():
-            warnings.warn(
-                f"Some of the {', '.join(itemgetter(*coord_outside.get())(uvw_map))} "
-                "coordinates lie outside the constructed image. This can lead to "
-                "cufinufft errors.",
-                stacklevel=2,
-            )
 
         # Values at source position (Source intensities)
-        c_values = torch_to_cupy(sky_values.flatten()).astype(cp.complex128)
+        c_values = cp.asarray(sky_values.flatten()).astype(cp.complex128)
 
-        result = self.ft(
-            source_l,
-            source_m,
-            source_n,
-            c_values,
-            target_u,
-            target_v,
-            target_w,
-        )
+        # cuFINUFFt expects arrays to be contiguous in memory
+        source_l = cp.ascontiguousarray(source_l, dtype=cp.float64)
+        source_m = cp.ascontiguousarray(source_m, dtype=cp.float64)
+        source_n = cp.ascontiguousarray(source_n, dtype=cp.float64)
+        c_values = cp.ascontiguousarray(c_values, dtype=cp.complex128)
+        target_u = cp.ascontiguousarray(target_u, dtype=cp.float64)
+        target_v = cp.ascontiguousarray(target_v, dtype=cp.float64)
+        target_w = cp.ascontiguousarray(target_w, dtype=cp.float64)
 
-        visibilities = cupy_to_torch(result)
+        try:
+            valid_result = self.ft(
+                source_l,
+                source_m,
+                source_n,
+                c_values,
+                target_u,
+                target_v,
+                target_w,
+            )
+        except RuntimeError as e:
+            # cuFINUFFT sometimes raises a generic RuntimeError
+            # if the GPU OOM. To ensure that pyvisgen reduces the
+            # batch size on OOM, we raise an CUDA OOM here.
+            if "Error setting non-uniform points" in str(e):
+                warnings.warn("cuFINUFFT internal OOM during setpts", stacklevel=2)
+                raise torch.cuda.OutOfMemoryError(
+                    "cuFINUFFT internal OOM during setpts"
+                ) from e
+            raise e
 
-        return visibilities
+        return torch.as_tensor(valid_result, device=u_coords.device)
 
     def inufft(
         self,
@@ -194,13 +179,13 @@ class CupyFinufft:
         and non-uniform target coordinates.
         """
         # Antenna coordinates (Fourier Domain - uvw coordinates)
-        source_u = torch_to_cupy(2 * pi * (u_coords.flatten() * self.px_size)).astype(
+        source_u = cp.asarray(2 * pi * (u_coords.flatten() * self.px_size)).astype(
             cp.float64
         )
-        source_v = torch_to_cupy(2 * pi * (v_coords.flatten() * self.px_size)).astype(
+        source_v = cp.asarray(2 * pi * (v_coords.flatten() * self.px_size)).astype(
             cp.float64
         )
-        source_w = torch_to_cupy(2 * pi * (w_coords.flatten() * self.px_size)).astype(
+        source_w = cp.asarray(2 * pi * (w_coords.flatten() * self.px_size)).astype(
             cp.float64
         )
 
@@ -213,50 +198,53 @@ class CupyFinufft:
             image_size=self.image_size,
         )
 
-        outside_bounds = cp.array(
-            [
-                (source_u <= -cp.pi) | (source_u > cp.pi),
-                (source_v <= -cp.pi) | (source_v > cp.pi),
-                (source_w <= -cp.pi) | (source_w > cp.pi),
-            ]
-        )
-        coord_outside = cp.where(cp.any(outside_bounds, axis=1))[0]
-
-        if outside_bounds.any():
-            warnings.warn(
-                f"Some of the {', '.join(itemgetter(*coord_outside.get())(uvw_map))} "
-                "coordinates lie outside the constructed image. This can lead to "
-                "cufinufft errors.",
-                stacklevel=2,
-            )
-
         # Fourier coeficients at antenna positions (Visibilities)
-        c_values = torch_to_cupy(visibilities.flatten()).astype(cp.complex128)
+        c_values = cp.asarray(visibilities.flatten()).astype(cp.complex128)
 
         # Normalize visibility values by dividing by their bin counts
         # This means visibilities that fall into the same bin are averaged
         c_values_normalized = c_values / visibility_weights
 
         # Sky coordinates (Image domain - lmn coordinates)
-        target_l = torch_to_cupy(l_coords.flatten() / self.px_size).astype(cp.float64)
-        target_m = torch_to_cupy(m_coords.flatten() / self.px_size).astype(cp.float64)
-        target_n = torch_to_cupy((n_coords.flatten() - 1) / self.px_size).astype(
+        target_l = cp.asarray(l_coords.flatten() / self.px_size).astype(cp.float64)
+        target_m = cp.asarray(m_coords.flatten() / self.px_size).astype(cp.float64)
+        target_n = cp.asarray((n_coords.flatten() - 1) / self.px_size).astype(
             cp.float64
         )
 
-        result = (
-            self.ift(
-                source_u,
-                source_v,
-                source_w,
-                c_values_normalized,
-                target_l,
-                target_m,
-                target_n,
-            )
-            / self.px_scaling
+        # cuFINUFFt expects arrays to be contiguous in memory
+        source_u = cp.ascontiguousarray(source_u, dtype=cp.float64)
+        source_v = cp.ascontiguousarray(source_v, dtype=cp.float64)
+        source_w = cp.ascontiguousarray(source_w, dtype=cp.float64)
+        c_values_normalized = cp.ascontiguousarray(
+            c_values_normalized, dtype=cp.complex128
         )
+        target_l = cp.ascontiguousarray(target_l, dtype=cp.float64)
+        target_m = cp.ascontiguousarray(target_m, dtype=cp.float64)
+        target_n = cp.ascontiguousarray(target_n, dtype=cp.float64)
 
-        sky_intensities = cupy_to_torch(result)
+        try:
+            result = (
+                self.ift(
+                    source_u,
+                    source_v,
+                    source_w,
+                    c_values_normalized,
+                    target_l,
+                    target_m,
+                    target_n,
+                )
+                / self.px_scaling
+            )
+        except RuntimeError as e:
+            # cuFINUFFT sometimes raises a generic RuntimeError
+            # if the GPU OOM. To ensure that pyvisgen reduces the
+            # batch size on OOM, we raise an CUDA OOM here.
+            if "Error setting non-uniform points" in str(e):
+                warnings.warn("cuFINUFFT internal OOM during setpts", stacklevel=2)
+                raise torch.cuda.OutOfMemoryError(
+                    "cuFINUFFT internal OOM during setpts"
+                ) from e
+            raise e
 
-        return sky_intensities
+        return torch.as_tensor(result, device=source_u.device)
