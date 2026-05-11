@@ -1,0 +1,1 @@
+Fixed a bug where the device ID was not passed to cupy and cufinufft, thus resulting in an memory error.
