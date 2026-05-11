@@ -114,33 +114,34 @@ class CupyFinufft:
         """Calculate the fast Fourier transform with non-uniform source
         and non-uniform target coordinates.
         """
-        # Sky coordinates (Image domain - lmn coordinates)
-        source_l = cp.asarray(l_coords / self.px_size).astype(cp.float64)
-        source_m = cp.asarray(m_coords / self.px_size).astype(cp.float64)
-        source_n = cp.asarray((n_coords - 1) / self.px_size).astype(cp.float64)
+        with cp.cuda.Device(u_coords.device.index):
+            # Sky coordinates (Image domain - lmn coordinates)
+            source_l = cp.asarray(l_coords / self.px_size).astype(cp.float64)
+            source_m = cp.asarray(m_coords / self.px_size).astype(cp.float64)
+            source_n = cp.asarray((n_coords - 1) / self.px_size).astype(cp.float64)
 
-        # Antenna coordinates (Fourier Domain - uvw coordinates)
-        target_u = cp.asarray(2 * pi * (u_coords.flatten() * self.px_size)).astype(
-            cp.float64
-        )
-        target_v = cp.asarray(2 * pi * (v_coords.flatten() * self.px_size)).astype(
-            cp.float64
-        )
-        target_w = cp.asarray(2 * pi * (w_coords.flatten() * self.px_size)).astype(
-            cp.float64
-        )
+            # Antenna coordinates (Fourier Domain - uvw coordinates)
+            target_u = cp.asarray(2 * pi * (u_coords.flatten() * self.px_size)).astype(
+                cp.float64
+            )
+            target_v = cp.asarray(2 * pi * (v_coords.flatten() * self.px_size)).astype(
+                cp.float64
+            )
+            target_w = cp.asarray(2 * pi * (w_coords.flatten() * self.px_size)).astype(
+                cp.float64
+            )
 
-        # Values at source position (Source intensities)
-        c_values = cp.asarray(sky_values.flatten()).astype(cp.complex128)
+            # Values at source position (Source intensities)
+            c_values = cp.asarray(sky_values.flatten()).astype(cp.complex128)
 
-        # cuFINUFFt expects arrays to be contiguous in memory
-        source_l = cp.ascontiguousarray(source_l, dtype=cp.float64)
-        source_m = cp.ascontiguousarray(source_m, dtype=cp.float64)
-        source_n = cp.ascontiguousarray(source_n, dtype=cp.float64)
-        c_values = cp.ascontiguousarray(c_values, dtype=cp.complex128)
-        target_u = cp.ascontiguousarray(target_u, dtype=cp.float64)
-        target_v = cp.ascontiguousarray(target_v, dtype=cp.float64)
-        target_w = cp.ascontiguousarray(target_w, dtype=cp.float64)
+            # cuFINUFFt expects arrays to be contiguous in memory
+            source_l = cp.ascontiguousarray(source_l, dtype=cp.float64)
+            source_m = cp.ascontiguousarray(source_m, dtype=cp.float64)
+            source_n = cp.ascontiguousarray(source_n, dtype=cp.float64)
+            c_values = cp.ascontiguousarray(c_values, dtype=cp.complex128)
+            target_u = cp.ascontiguousarray(target_u, dtype=cp.float64)
+            target_v = cp.ascontiguousarray(target_v, dtype=cp.float64)
+            target_w = cp.ascontiguousarray(target_w, dtype=cp.float64)
 
         try:
             valid_result = self.ft(
@@ -151,6 +152,7 @@ class CupyFinufft:
                 target_u,
                 target_v,
                 target_w,
+                gpu_device_id=u_coords.device.index,
             )
         except RuntimeError as e:
             # cuFINUFFT sometimes raises a generic RuntimeError
