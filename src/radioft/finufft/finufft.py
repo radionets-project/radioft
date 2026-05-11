@@ -152,7 +152,7 @@ class CupyFinufft:
                 target_u,
                 target_v,
                 target_w,
-                gpu_device_id=u_coords.device.index
+                gpu_device_id=u_coords.device.index,
             )
         except RuntimeError as e:
             # cuFINUFFT sometimes raises a generic RuntimeError
